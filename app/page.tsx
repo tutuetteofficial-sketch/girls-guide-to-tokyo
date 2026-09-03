@@ -1,69 +1,665 @@
-import Image from "next/image";
+import Link from "next/link";
+import Header from "@/components/Header";
+import { supabase } from "@/lib/supabase";
 
-export default function Home() {
+type Place = {
+  id: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+};
+
+type Food = {
+  id: string;
+  name: string;
+  description: string | null;
+  image_url: string | null;
+  editor_pick: number | null;
+};
+
+type Product = {
+  id: string;
+  name: string;
+  brand: string | null;
+  description: string | null;
+  image_url: string | null;
+  editor_pick: number | null;
+};
+
+type Article = {
+  id: string;
+  title: string;
+  excerpt: string | null;
+  image_url: string | null;
+};
+
+export default async function HomePage() {
+  const [
+    placesResult,
+    foodsResult,
+    productsResult,
+    articlesResult,
+  ] = await Promise.all([
+    supabase
+      .from("places")
+      .select(`
+        id,
+        name,
+        description,
+        image_url
+      `)
+      .eq("status", "published")
+      .order("updated_at", {
+        ascending: false,
+      })
+      .limit(4),
+
+    supabase
+      .from("foods")
+      .select(`
+        id,
+        name,
+        description,
+        image_url,
+        editor_pick
+      `)
+      .eq("status", "active")
+      .order("editor_pick", {
+        ascending: false,
+      })
+      .limit(4),
+
+    supabase
+      .from("products")
+      .select(`
+        id,
+        name,
+        brand,
+        description,
+        image_url,
+        editor_pick
+      `)
+      .eq("status", "published")
+      .order("editor_pick", {
+        ascending: false,
+      })
+      .limit(4),
+
+    supabase
+      .from("articles")
+      .select(`
+        id,
+        title,
+        excerpt,
+        image_url
+      `)
+      .eq("status", "published")
+      .order("updated_at", {
+        ascending: false,
+      })
+      .limit(3),
+  ]);
+
+  const places =
+    (placesResult.data ?? []) as Place[];
+
+  const foods =
+    (foodsResult.data ?? []) as Food[];
+
+  const products =
+    (productsResult.data ?? []) as Product[];
+
+  const articles =
+    (articlesResult.data ?? []) as Article[];
+
   return (
-    <div className="flex flex-col flex-1 items-center justify-center bg-zinc-50 font-sans dark:bg-black">
-      <main className="flex flex-1 w-full max-w-3xl flex-col items-center justify-between py-32 px-16 bg-white dark:bg-black sm:items-start">
-        <Image
-          className="dark:invert h-5 w-[100px]"
-          src="/next.svg"
-          alt="Next.js logo"
-          width={100}
-          height={20}
-          priority
-        />
-        <div className="flex flex-col items-center gap-6 text-center sm:items-start sm:text-left">
-          <h1 className="max-w-xs text-3xl font-semibold leading-10 tracking-tight text-black dark:text-zinc-50">
-            To get started, edit the{" "}
-            <code className="rounded bg-black/[.06] px-1.5 py-0.5 font-mono text-[0.9em] dark:bg-white/[.08]">
-              page.tsx
-            </code>{" "}
-            file.
+    <main style={styles.main}>
+      <Header />
+
+      {/* HERO */}
+
+      <section style={styles.hero}>
+        <div style={styles.heroInner}>
+          <p style={styles.heroEyebrow}>
+            TOKYO, CURATED
+          </p>
+
+          <h1 style={styles.heroTitle}>
+            Tokyo,
+            <br />
+            through our eyes.
           </h1>
-          <p className="max-w-md text-lg leading-8 text-zinc-600 dark:text-zinc-400">
-            Looking for a starting point or more instructions? Head over to{" "}
-            <a
-              href="https://vercel.com/templates?framework=next.js&utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Templates
-            </a>{" "}
-            or the{" "}
-            <a
-              href="https://nextjs.org/learn?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-              className="font-medium text-zinc-950 dark:text-zinc-50"
-            >
-              Learning
-            </a>{" "}
-            center.
+
+          <p style={styles.heroText}>
+            Places to go.
+            <br />
+            Things to eat.
+            <br />
+            Things worth bringing home.
           </p>
         </div>
-        <div className="flex flex-col gap-4 text-base font-medium sm:flex-row">
-          <a
-            className="flex h-12 w-full items-center justify-center gap-2 rounded-full bg-foreground px-5 text-background transition-colors hover:bg-[#383838] dark:hover:bg-[#ccc] md:w-[158px]"
-            href="https://vercel.com/new?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <Image
-              className="dark:invert h-[14px] w-4"
-              src="/vercel.svg"
-              alt="Vercel logomark"
-              width={16}
-              height={14}
-            />
-            Deploy Now
-          </a>
-          <a
-            className="flex h-12 w-full items-center justify-center rounded-full border border-solid border-black/[.08] px-5 transition-colors hover:border-transparent hover:bg-black/[.04] dark:border-white/[.145] dark:hover:bg-[#1a1a1a] md:w-[158px]"
-            href="https://nextjs.org/docs?utm_source=create-next-app&utm_medium=appdir-template-tw&utm_campaign=create-next-app"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            Documentation
-          </a>
-        </div>
-      </main>
+      </section>
+
+      <div style={styles.container}>
+
+        {/* PLACES */}
+
+        <section style={styles.section}>
+          <SectionHeader
+            eyebrow="WHERE TO GO"
+            title="Places"
+            href="/places"
+          />
+
+          <div style={styles.gridFour}>
+            {places.length === 0 ? (
+              <Empty text="No places yet." />
+            ) : (
+              places.map((place) => (
+                <Link
+                  key={place.id}
+                  href={`/places/${place.id}`}
+                  style={styles.card}
+                >
+                  <ImageBox
+                    image={place.image_url}
+                    alt={place.name}
+                  />
+
+                  <h3 style={styles.cardTitle}>
+                    {place.name}
+                  </h3>
+
+                  {place.description && (
+                    <p style={styles.cardText}>
+                      {place.description}
+                    </p>
+                  )}
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* FOOD */}
+
+        <section style={styles.section}>
+          <SectionHeader
+            eyebrow="WHAT TO EAT"
+            title="Food"
+            href="/foods"
+          />
+
+          <div style={styles.gridFour}>
+            {foods.length === 0 ? (
+              <Empty text="No food yet." />
+            ) : (
+              foods.map((food) => (
+                <Link
+                  key={food.id}
+                  href={`/foods/${food.id}`}
+                  style={styles.card}
+                >
+                  <div style={styles.imageWrapper}>
+                    <ImageBox
+                      image={food.image_url}
+                      alt={food.name}
+                    />
+
+                    {(food.editor_pick ?? 0) > 0 && (
+                      <span style={styles.pickBadge}>
+                        PICK
+                      </span>
+                    )}
+                  </div>
+
+                  <h3 style={styles.cardTitle}>
+                    {food.name}
+                  </h3>
+
+                  {food.description && (
+                    <p style={styles.cardText}>
+                      {food.description}
+                    </p>
+                  )}
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* PRODUCTS */}
+
+        <section style={styles.section}>
+          <SectionHeader
+            eyebrow="WHAT TO BUY"
+            title="Products"
+            href="/products"
+          />
+
+          <div style={styles.gridFour}>
+            {products.length === 0 ? (
+              <Empty text="No products yet." />
+            ) : (
+              products.map((product) => (
+                <Link
+                  key={product.id}
+                  href={`/products/${product.id}`}
+                  style={styles.card}
+                >
+                  <div style={styles.imageWrapper}>
+                    <ImageBox
+                      image={product.image_url}
+                      alt={product.name}
+                    />
+
+                    {(product.editor_pick ?? 0) > 0 && (
+                      <span style={styles.pickBadge}>
+                        PICK
+                      </span>
+                    )}
+                  </div>
+
+                  {product.brand && (
+                    <p style={styles.brand}>
+                      {product.brand}
+                    </p>
+                  )}
+
+                  <h3 style={styles.cardTitle}>
+                    {product.name}
+                  </h3>
+
+                  {product.description && (
+                    <p style={styles.cardText}>
+                      {product.description}
+                    </p>
+                  )}
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+
+        {/* ARTICLES */}
+
+        <section style={styles.section}>
+          <SectionHeader
+            eyebrow="TOKYO STORIES"
+            title="Articles"
+            href="/articles"
+          />
+
+          <div style={styles.articleGrid}>
+            {articles.length === 0 ? (
+              <Empty text="No articles yet." />
+            ) : (
+              articles.map((article) => (
+                <Link
+                  key={article.id}
+                  href={`/articles/${article.id}`}
+                  style={styles.articleCard}
+                >
+                  <ImageBox
+                    image={article.image_url}
+                    alt={article.title}
+                  />
+
+                  <div style={styles.articleBody}>
+                    <h3 style={styles.articleTitle}>
+                      {article.title}
+                    </h3>
+
+                    {article.excerpt && (
+                      <p style={styles.cardText}>
+                        {article.excerpt}
+                      </p>
+                    )}
+
+                    <span style={styles.readMore}>
+                      Read story →
+                    </span>
+                  </div>
+                </Link>
+              ))
+            )}
+          </div>
+        </section>
+
+        <footer style={styles.footer}>
+          <div>
+            <p style={styles.footerLogo}>
+              TOKYO GUIDE
+            </p>
+
+            <p style={styles.footerText}>
+              A curated guide to Tokyo.
+            </p>
+          </div>
+
+          <p style={styles.footerText}>
+            © TOKYO GUIDE
+          </p>
+        </footer>
+      </div>
+    </main>
+  );
+}
+
+function SectionHeader({
+  eyebrow,
+  title,
+  href,
+}: {
+  eyebrow: string;
+  title: string;
+  href: string;
+}) {
+  return (
+    <div style={styles.sectionHeader}>
+      <div>
+        <p style={styles.eyebrow}>
+          {eyebrow}
+        </p>
+
+        <h2 style={styles.sectionTitle}>
+          {title}
+        </h2>
+      </div>
+
+      <Link
+        href={href}
+        style={styles.viewAll}
+      >
+        View all →
+      </Link>
     </div>
   );
 }
+
+function ImageBox({
+  image,
+  alt,
+}: {
+  image: string | null;
+  alt: string;
+}) {
+  return (
+    <div style={styles.image}>
+      {image ? (
+        <img
+          src={image}
+          alt={alt}
+          style={styles.imageElement}
+        />
+      ) : (
+        <span style={styles.placeholder}>
+          TOKYO GUIDE
+        </span>
+      )}
+    </div>
+  );
+}
+
+function Empty({
+  text,
+}: {
+  text: string;
+}) {
+  return (
+    <div style={styles.empty}>
+      {text}
+    </div>
+  );
+}
+
+const styles = {
+  main: {
+    minHeight: "100vh",
+    background: "#fffaf8",
+    color: "#222",
+  },
+
+  hero: {
+    minHeight: "520px",
+    background: "#f2e7e2",
+    display: "flex",
+    alignItems: "center",
+  },
+
+  heroInner: {
+    width: "100%",
+    maxWidth: "1150px",
+    margin: "0 auto",
+    padding: "80px 24px",
+  },
+
+  heroEyebrow: {
+    color: "#c8647b",
+    fontSize: "10px",
+    fontWeight: 700,
+    letterSpacing: "3px",
+    margin: 0,
+  },
+
+  heroTitle: {
+    fontFamily: "Georgia, serif",
+    fontWeight: 400,
+    fontSize: "76px",
+    lineHeight: 0.95,
+    margin: "22px 0",
+  },
+
+  heroText: {
+    color: "#666",
+    fontSize: "16px",
+    lineHeight: 1.8,
+    margin: 0,
+  },
+
+  container: {
+    maxWidth: "1150px",
+    margin: "0 auto",
+    padding: "0 24px 80px",
+  },
+
+  section: {
+    paddingTop: "85px",
+  },
+
+  sectionHeader: {
+    display: "flex",
+    alignItems: "flex-end",
+    justifyContent: "space-between",
+    marginBottom: "28px",
+  },
+
+  eyebrow: {
+    color: "#c8647b",
+    fontSize: "10px",
+    fontWeight: 700,
+    letterSpacing: "3px",
+    margin: 0,
+  },
+
+  sectionTitle: {
+    fontFamily: "Georgia, serif",
+    fontSize: "42px",
+    fontWeight: 400,
+    margin: "8px 0 0",
+  },
+
+  viewAll: {
+    color: "#777",
+    textDecoration: "none",
+    fontSize: "12px",
+    paddingBottom: "6px",
+  },
+
+  gridFour: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(4, minmax(0, 1fr))",
+    gap: "20px",
+    alignItems: "start",
+  },
+
+  card: {
+    color: "#222",
+    textDecoration: "none",
+    minWidth: 0,
+    display: "block",
+  },
+
+  imageWrapper: {
+    position: "relative" as const,
+  },
+
+  image: {
+    width: "100%",
+    aspectRatio: "1 / 1",
+    background: "#f2e7e2",
+    borderRadius: "14px",
+    overflow: "hidden",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+  },
+
+  imageElement: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover" as const,
+    display: "block",
+  },
+
+  placeholder: {
+    color: "#987a73",
+    fontFamily: "Georgia, serif",
+    fontSize: "9px",
+    letterSpacing: "2px",
+  },
+
+  pickBadge: {
+    position: "absolute" as const,
+    top: "10px",
+    right: "10px",
+    background: "#222",
+    color: "#fff",
+    fontSize: "8px",
+    padding: "6px 8px",
+    borderRadius: "999px",
+    letterSpacing: "1px",
+  },
+
+  brand: {
+    color: "#c8647b",
+    fontSize: "9px",
+    fontWeight: 700,
+    letterSpacing: "0.8px",
+    margin: "12px 0 0",
+    textTransform: "uppercase" as const,
+  },
+
+  cardTitle: {
+    fontFamily: "Georgia, serif",
+    fontWeight: 400,
+    fontSize: "21px",
+    lineHeight: 1.25,
+    margin: "10px 0 0",
+
+    /* タイトルが長くても暴れない */
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical" as const,
+    overflow: "hidden",
+  },
+
+  cardText: {
+    color: "#777",
+    fontSize: "11px",
+    lineHeight: 1.7,
+    margin: "7px 0 0",
+
+    /* ★ 説明文は3行まで */
+    display: "-webkit-box",
+    WebkitLineClamp: 3,
+    WebkitBoxOrient: "vertical" as const,
+    overflow: "hidden",
+  },
+
+  articleGrid: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(3, minmax(0, 1fr))",
+    gap: "22px",
+    alignItems: "start",
+  },
+
+  articleCard: {
+    color: "#222",
+    textDecoration: "none",
+    background: "#fff",
+    border: "1px solid #e7e0dc",
+    borderRadius: "15px",
+    overflow: "hidden",
+    display: "block",
+  },
+
+  articleBody: {
+    padding: "18px",
+  },
+
+  articleTitle: {
+    fontFamily: "Georgia, serif",
+    fontWeight: 400,
+    fontSize: "24px",
+    lineHeight: 1.3,
+    margin: 0,
+
+    display: "-webkit-box",
+    WebkitLineClamp: 2,
+    WebkitBoxOrient: "vertical" as const,
+    overflow: "hidden",
+  },
+
+  readMore: {
+    display: "inline-block",
+    color: "#c8647b",
+    fontSize: "11px",
+    marginTop: "15px",
+  },
+
+  empty: {
+    gridColumn: "1 / -1",
+    padding: "45px",
+    textAlign: "center" as const,
+    background: "#fff",
+    border: "1px solid #e7e0dc",
+    borderRadius: "14px",
+    color: "#999",
+    fontSize: "13px",
+  },
+
+  footer: {
+    marginTop: "100px",
+    paddingTop: "35px",
+    borderTop: "1px solid #e7e0dc",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-end",
+  },
+
+  footerLogo: {
+    fontFamily: "Georgia, serif",
+    letterSpacing: "2px",
+    fontSize: "14px",
+    margin: 0,
+  },
+
+  footerText: {
+    color: "#999",
+    fontSize: "10px",
+    marginTop: "8px",
+  },
+};
