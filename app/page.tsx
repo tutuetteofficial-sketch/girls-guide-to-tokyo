@@ -116,32 +116,7 @@ export default async function HomePage() {
     <main style={styles.main}>
       <Header />
 
-      {/* HERO */}
-
-      <section style={styles.hero}>
-        <div style={styles.heroInner}>
-          <p style={styles.heroEyebrow}>
-            TOKYO, CURATED
-          </p>
-
-          <h1 style={styles.heroTitle}>
-            Tokyo,
-            <br />
-            through our eyes.
-          </h1>
-
-          <p style={styles.heroText}>
-            Places to go.
-            <br />
-            Things to eat.
-            <br />
-            Things worth bringing home.
-          </p>
-        </div>
-      </section>
-
       <div style={styles.container}>
-
         {/* PLACES */}
 
         <section style={styles.section}>
@@ -329,7 +304,7 @@ export default async function HomePage() {
         <footer style={styles.footer}>
           <div>
             <p style={styles.footerLogo}>
-              TOKYO GUIDE
+              Girls' Guide to TOKYO
             </p>
 
             <p style={styles.footerText}>
@@ -338,7 +313,7 @@ export default async function HomePage() {
           </div>
 
           <p style={styles.footerText}>
-            © TOKYO GUIDE
+            © Girls' Guide to TOKYO
           </p>
         </footer>
       </div>
@@ -394,7 +369,7 @@ function ImageBox({
         />
       ) : (
         <span style={styles.placeholder}>
-          TOKYO GUIDE
+          Girls' Guide to TOKYO
         </span>
       )}
     </div>
@@ -420,43 +395,6 @@ const styles = {
     color: "#222",
   },
 
-  hero: {
-    minHeight: "520px",
-    background: "#f2e7e2",
-    display: "flex",
-    alignItems: "center",
-  },
-
-  heroInner: {
-    width: "100%",
-    maxWidth: "1150px",
-    margin: "0 auto",
-    padding: "80px 24px",
-  },
-
-  heroEyebrow: {
-    color: "#c8647b",
-    fontSize: "10px",
-    fontWeight: 700,
-    letterSpacing: "3px",
-    margin: 0,
-  },
-
-  heroTitle: {
-    fontFamily: "Georgia, serif",
-    fontWeight: 400,
-    fontSize: "76px",
-    lineHeight: 0.95,
-    margin: "22px 0",
-  },
-
-  heroText: {
-    color: "#666",
-    fontSize: "16px",
-    lineHeight: 1.8,
-    margin: 0,
-  },
-
   container: {
     maxWidth: "1150px",
     margin: "0 auto",
@@ -464,13 +402,14 @@ const styles = {
   },
 
   section: {
-    paddingTop: "85px",
+    paddingTop: "70px",
   },
 
   sectionHeader: {
     display: "flex",
     alignItems: "flex-end",
     justifyContent: "space-between",
+    gap: "20px",
     marginBottom: "28px",
   },
 
@@ -494,6 +433,7 @@ const styles = {
     textDecoration: "none",
     fontSize: "12px",
     paddingBottom: "6px",
+    whiteSpace: "nowrap" as const,
   },
 
   gridFour: {
@@ -537,7 +477,9 @@ const styles = {
     color: "#987a73",
     fontFamily: "Georgia, serif",
     fontSize: "9px",
-    letterSpacing: "2px",
+    letterSpacing: "1px",
+    textAlign: "center" as const,
+    padding: "10px",
   },
 
   pickBadge: {
@@ -567,8 +509,6 @@ const styles = {
     fontSize: "21px",
     lineHeight: 1.25,
     margin: "10px 0 0",
-
-    /* タイトルが長くても暴れない */
     display: "-webkit-box",
     WebkitLineClamp: 2,
     WebkitBoxOrient: "vertical" as const,
@@ -580,8 +520,6 @@ const styles = {
     fontSize: "11px",
     lineHeight: 1.7,
     margin: "7px 0 0",
-
-    /* ★ 説明文は3行まで */
     display: "-webkit-box",
     WebkitLineClamp: 3,
     WebkitBoxOrient: "vertical" as const,
@@ -616,7 +554,6 @@ const styles = {
     fontSize: "24px",
     lineHeight: 1.3,
     margin: 0,
-
     display: "-webkit-box",
     WebkitLineClamp: 2,
     WebkitBoxOrient: "vertical" as const,
@@ -648,11 +585,12 @@ const styles = {
     display: "flex",
     justifyContent: "space-between",
     alignItems: "flex-end",
+    gap: "20px",
   },
 
   footerLogo: {
     fontFamily: "Georgia, serif",
-    letterSpacing: "2px",
+    letterSpacing: "1px",
     fontSize: "14px",
     margin: 0,
   },

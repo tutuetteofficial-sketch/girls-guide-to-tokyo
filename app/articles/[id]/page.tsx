@@ -114,29 +114,14 @@ export default async function ArticleDetailPage({
             )}
           </div>
 
-          <div style={styles.content}>
-            {article.content
-              .split(/\n\s*\n/)
-              .filter(
-                (paragraph) =>
-                  paragraph.trim().length > 0
-              )
-              .map((paragraph, index) => (
-                <p key={index}>
-                  {paragraph
-                    .split("\n")
-                    .map((line, lineIndex, lines) => (
-                      <span key={lineIndex}>
-                        {line}
-
-                        {lineIndex < lines.length - 1 && (
-                          <br />
-                        )}
-                      </span>
-                    ))}
-                </p>
-              ))}
-          </div>
+          {/* ARTICLE CONTENT */}
+          <div
+            className="article-content"
+            style={styles.content}
+            dangerouslySetInnerHTML={{
+              __html: article.content,
+            }}
+          />
         </article>
 
         <section style={styles.relatedSection}>
