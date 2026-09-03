@@ -333,8 +333,7 @@ export default async function ProductDetailPage({
               {loadedProduct.name}
             </h1>
 
-            {(loadedProduct.editor_pick ?? 0) >
-              0 && (
+            {(loadedProduct.editor_pick ?? 0) > 0 && (
               <div style={styles.pick}>
                 <span>
                   TOKYO GIRL PICK
@@ -489,9 +488,7 @@ export default async function ProductDetailPage({
                 const groupName =
                   place.group_id
                     ? groupMap.get(
-                        String(
-                          place.group_id
-                        )
+                        String(place.group_id)
                       ) ?? null
                     : null;
 
@@ -612,52 +609,6 @@ export default async function ProductDetailPage({
           )}
         </section>
       </div>
-
-      <style jsx>{`
-        @media (max-width: 800px) {
-          .product-detail-hero {
-            grid-template-columns: 1fr !important;
-            gap: 30px !important;
-          }
-
-          .product-variant-grid {
-            grid-template-columns:
-              repeat(
-                2,
-                minmax(0, 1fr)
-              ) !important;
-          }
-
-          .product-place-grid {
-            grid-template-columns:
-              repeat(
-                2,
-                minmax(0, 1fr)
-              ) !important;
-          }
-        }
-
-        @media (max-width: 520px) {
-          .product-detail-container {
-            padding-left: 16px !important;
-            padding-right: 16px !important;
-          }
-
-          .product-detail-title {
-            font-size: 38px !important;
-          }
-
-          .product-place-grid {
-            grid-template-columns:
-              1fr !important;
-          }
-
-          .product-section-header {
-            align-items:
-              flex-start !important;
-          }
-        }
-      `}</style>
     </main>
   );
 }

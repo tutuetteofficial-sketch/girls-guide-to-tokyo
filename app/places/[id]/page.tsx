@@ -88,7 +88,6 @@ export default async function PlaceDetailPage({
   const [
     imagesResult,
     categoriesResult,
-    relationsResult,
     regionResult,
     areaResult,
     groupResult,
@@ -113,11 +112,6 @@ export default async function PlaceDetailPage({
           name
         )
       `)
-      .eq("place_id", place.id),
-
-    supabase
-      .from("place_category_relations")
-      .select("category_id")
       .eq("place_id", place.id),
 
     place.region_id !== null
@@ -219,10 +213,7 @@ export default async function PlaceDetailPage({
     <main style={styles.main}>
       <Header />
 
-      <div
-        style={styles.container}
-        className="place-detail-container"
-      >
+      <div style={styles.container}>
         <div style={styles.subHeader}>
           <Link
             href="/places"
@@ -232,14 +223,8 @@ export default async function PlaceDetailPage({
           </Link>
         </div>
 
-        <section
-          style={styles.hero}
-          className="place-detail-hero"
-        >
-          <div
-            style={styles.imageArea}
-            className="place-detail-image-area"
-          >
+        <section style={styles.hero}>
+          <div style={styles.imageArea}>
             {images.length > 0 ? (
               <img
                 src={images[0].image_url}
@@ -273,19 +258,14 @@ export default async function PlaceDetailPage({
               </div>
             )}
 
-            <h1
-              style={styles.title}
-              className="place-detail-title"
-            >
+            <h1 style={styles.title}>
               {place.name}
             </h1>
 
             {(region || area) && (
               <p style={styles.location}>
                 {region?.name ?? ""}
-
                 {region && area ? " / " : ""}
-
                 {area?.name ?? ""}
               </p>
             )}
@@ -304,19 +284,11 @@ export default async function PlaceDetailPage({
 
             {place.editor_note && (
               <div style={styles.editorNote}>
-                <p
-                  style={
-                    styles.editorNoteLabel
-                  }
-                >
+                <p style={styles.editorNoteLabel}>
                   TOKYO GIRL'S NOTE
                 </p>
 
-                <p
-                  style={
-                    styles.editorNoteText
-                  }
-                >
+                <p style={styles.editorNoteText}>
                   {place.editor_note}
                 </p>
               </div>
@@ -328,24 +300,17 @@ export default async function PlaceDetailPage({
           <section style={styles.section}>
             <div style={styles.sectionHeader}>
               <div>
-                <p
-                  style={styles.sectionEyebrow}
-                >
+                <p style={styles.sectionEyebrow}>
                   INSIDE THE PLACE
                 </p>
 
-                <h2
-                  style={styles.sectionTitle}
-                >
+                <h2 style={styles.sectionTitle}>
                   Gallery
                 </h2>
               </div>
             </div>
 
-            <div
-              style={styles.galleryGrid}
-              className="place-gallery-grid"
-            >
+            <div style={styles.galleryGrid}>
               {images.slice(1).map((image) => (
                 <div
                   key={image.id}
@@ -365,14 +330,9 @@ export default async function PlaceDetailPage({
         )}
 
         <section style={styles.section}>
-          <div
-            style={styles.sectionHeader}
-            className="place-section-header"
-          >
+          <div style={styles.sectionHeader}>
             <div>
-              <p
-                style={styles.sectionEyebrow}
-              >
+              <p style={styles.sectionEyebrow}>
                 WHAT TO BUY
               </p>
 
@@ -403,19 +363,14 @@ export default async function PlaceDetailPage({
               </p>
             </div>
           ) : (
-            <div
-              style={styles.productGrid}
-              className="place-product-grid"
-            >
+            <div style={styles.productGrid}>
               {products.map((product) => (
                 <Link
                   key={product.id}
                   href={`/products/${product.id}`}
                   style={styles.productCard}
                 >
-                  <div
-                    style={styles.productImage}
-                  >
+                  <div style={styles.productImage}>
                     {product.image_url ? (
                       <img
                         src={product.image_url}
@@ -432,28 +387,20 @@ export default async function PlaceDetailPage({
 
                     {(product.editor_pick ?? 0) >
                       0 && (
-                      <span
-                        style={
-                          styles.pickBadge
-                        }
-                      >
+                      <span style={styles.pickBadge}>
                         PICK
                       </span>
                     )}
                   </div>
 
-                  <div
-                    style={styles.productBody}
-                  >
+                  <div style={styles.productBody}>
                     {product.brand && (
                       <p style={styles.brand}>
                         {product.brand}
                       </p>
                     )}
 
-                    <h3
-                      style={styles.productName}
-                    >
+                    <h3 style={styles.productName}>
                       {product.name}
                     </h3>
 
@@ -467,9 +414,7 @@ export default async function PlaceDetailPage({
                       </p>
                     )}
 
-                    <div
-                      style={styles.viewProduct}
-                    >
+                    <div style={styles.viewProduct}>
                       <span>
                         View product
                       </span>
@@ -483,58 +428,6 @@ export default async function PlaceDetailPage({
           )}
         </section>
       </div>
-
-      <style jsx>{`
-        @media (max-width: 800px) {
-          .place-detail-hero {
-            grid-template-columns:
-              1fr !important;
-            gap: 30px !important;
-          }
-
-          .place-gallery-grid {
-            grid-template-columns:
-              repeat(
-                2,
-                minmax(0, 1fr)
-              ) !important;
-          }
-
-          .place-product-grid {
-            grid-template-columns:
-              repeat(
-                2,
-                minmax(0, 1fr)
-              ) !important;
-          }
-        }
-
-        @media (max-width: 520px) {
-          .place-detail-container {
-            padding-left: 16px !important;
-            padding-right: 16px !important;
-          }
-
-          .place-detail-title {
-            font-size: 38px !important;
-          }
-
-          .place-gallery-grid {
-            grid-template-columns:
-              1fr !important;
-          }
-
-          .place-product-grid {
-            grid-template-columns:
-              1fr !important;
-          }
-
-          .place-section-header {
-            align-items:
-              flex-start !important;
-          }
-        }
-      `}</style>
     </main>
   );
 }
@@ -565,7 +458,7 @@ const styles = {
   hero: {
     display: "grid",
     gridTemplateColumns:
-      "1.05fr 1fr",
+      "minmax(0, 1.05fr) minmax(0, 1fr)",
     gap: "55px",
     alignItems: "start",
     paddingTop: "28px",

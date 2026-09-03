@@ -73,10 +73,7 @@ export default async function ArticleDetailPage({
     <main style={styles.main}>
       <Header />
 
-      <div
-        style={styles.container}
-        className="article-detail-container"
-      >
+      <div style={styles.container}>
         <div style={styles.subHeader}>
           <Link
             href="/articles"
@@ -94,10 +91,7 @@ export default async function ArticleDetailPage({
               </p>
             )}
 
-            <h1
-              style={styles.title}
-              className="article-detail-title"
-            >
+            <h1 style={styles.title}>
               {article.title}
             </h1>
 
@@ -106,10 +100,7 @@ export default async function ArticleDetailPage({
             </p>
           </header>
 
-          <div
-            style={styles.coverWrap}
-            className="article-detail-cover"
-          >
+          <div style={styles.coverWrap}>
             {article.cover_image ? (
               <img
                 src={article.cover_image}
@@ -123,10 +114,7 @@ export default async function ArticleDetailPage({
             )}
           </div>
 
-          <div
-            style={styles.content}
-            className="article-content"
-          >
+          <div style={styles.content}>
             {article.content
               .split(/\n\s*\n/)
               .filter(
@@ -172,19 +160,14 @@ export default async function ArticleDetailPage({
           </div>
 
           {relatedArticles.length > 0 ? (
-            <div
-              style={styles.relatedGrid}
-              className="related-articles-grid"
-            >
+            <div style={styles.relatedGrid}>
               {relatedArticles.map((related) => (
                 <Link
                   key={related.id}
                   href={`/articles/${related.id}`}
                   style={styles.relatedCard}
                 >
-                  <div
-                    style={styles.relatedImageWrap}
-                  >
+                  <div style={styles.relatedImageWrap}>
                     {related.cover_image ? (
                       <img
                         src={related.cover_image}
@@ -192,9 +175,7 @@ export default async function ArticleDetailPage({
                         style={styles.relatedImage}
                       />
                     ) : (
-                      <div
-                        style={styles.relatedPlaceholder}
-                      >
+                      <div style={styles.relatedPlaceholder}>
                         TOKYO GUIDE
                       </div>
                     )}
@@ -202,16 +183,12 @@ export default async function ArticleDetailPage({
 
                   <div style={styles.relatedBody}>
                     {related.category && (
-                      <p
-                        style={styles.relatedCategory}
-                      >
+                      <p style={styles.relatedCategory}>
                         {related.category}
                       </p>
                     )}
 
-                    <h3
-                      style={styles.relatedCardTitle}
-                    >
+                    <h3 style={styles.relatedCardTitle}>
                       {related.title}
                     </h3>
 
@@ -229,34 +206,6 @@ export default async function ArticleDetailPage({
           )}
         </section>
       </div>
-
-      <style jsx>{`
-        @media (max-width: 800px) {
-          .related-articles-grid {
-            grid-template-columns:
-              repeat(2, minmax(0, 1fr)) !important;
-          }
-        }
-
-        @media (max-width: 520px) {
-          .article-detail-container {
-            padding-left: 16px !important;
-            padding-right: 16px !important;
-          }
-
-          .article-detail-title {
-            font-size: 38px !important;
-          }
-
-          .related-articles-grid {
-            grid-template-columns: 1fr !important;
-          }
-
-          .article-detail-cover {
-            border-radius: 12px !important;
-          }
-        }
-      `}</style>
     </main>
   );
 }
