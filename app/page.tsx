@@ -1,5 +1,4 @@
 import Link from "next/link";
-import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
 
 type Place = {
@@ -114,7 +113,6 @@ export default async function HomePage() {
 
   return (
     <main style={styles.main}>
-      <Header />
 
       <div style={styles.container}>
         {/* PLACES */}
@@ -301,21 +299,7 @@ export default async function HomePage() {
           </div>
         </section>
 
-        <footer style={styles.footer}>
-          <div>
-            <p style={styles.footerLogo}>
-              Girls' Guide to TOKYO
-            </p>
 
-            <p style={styles.footerText}>
-              A curated guide to Tokyo.
-            </p>
-          </div>
-
-          <p style={styles.footerText}>
-            © Girls' Guide to TOKYO
-          </p>
-        </footer>
       </div>
     </main>
   );
@@ -578,26 +562,5 @@ const styles = {
     fontSize: "13px",
   },
 
-  footer: {
-    marginTop: "100px",
-    paddingTop: "35px",
-    borderTop: "1px solid #e7e0dc",
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    gap: "20px",
-  },
-
-  footerLogo: {
-    fontFamily: "Georgia, serif",
-    letterSpacing: "1px",
-    fontSize: "14px",
-    margin: 0,
-  },
-
-  footerText: {
-    color: "#999",
-    fontSize: "10px",
-    marginTop: "8px",
-  },
+  
 };
