@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-import SiteHeader from "@/components/SiteHeader";
+
 import { supabase } from "@/lib/supabase";
 
 type Article = {
@@ -26,7 +26,7 @@ export default async function ArticlesPage() {
 
   return (
     <main style={styles.main}>
-      <SiteHeader />
+     
 
       <div style={styles.container}>
         <header style={styles.header}>

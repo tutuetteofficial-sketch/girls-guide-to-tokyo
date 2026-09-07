@@ -1,7 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 
-import SiteHeader from "@/components/SiteHeader";
 
 import { supabase } from "@/lib/supabase";
 
@@ -78,7 +77,7 @@ export default async function ArticleDetailPage({
 
   return (
     <main style={styles.main}>
-      <SiteHeader />
+  
 
     
 
