@@ -1,6 +1,10 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
 import SiteHeader from "@/components/SiteHeader";
+
+import ArticleContentStyles from "@/components/article-folder/ArticleContentStyles";
+
 import { supabase } from "@/lib/supabase";
 
 type Article = {
@@ -24,14 +28,16 @@ export default async function ArticleDetailPage({
     error,
   } = await supabase
     .from("articles")
-    .select(`
+    .select(
+      `
       id,
       title,
       category,
       cover_image,
       content,
       created_at
-    `)
+      `
+    )
     .eq("id", id)
     .eq("status", "published")
     .single();
@@ -42,17 +48,16 @@ export default async function ArticleDetailPage({
 
   const article = articleData as Article;
 
-  const {
-    data: relatedData,
-  } = await supabase
+  const { data: relatedData } = await supabase
     .from("articles")
-    .select(`
+    .select(
+      `
       id,
       title,
       category,
-      cover_image,
-      created_at
-    `)
+      cover_image
+      `
+    )
     .eq("status", "published")
     .neq("id", article.id)
     .order("created_at", {
@@ -60,7 +65,11 @@ export default async function ArticleDetailPage({
     })
     .limit(3);
 
-  const relatedArticles = relatedData ?? [];
+  const relatedArticles =
+    (relatedData ?? []) as Pick<
+      Article,
+      "id" | "title" | "category" | "cover_image"
+    >[];
 
   const formattedDate =
     new Intl.DateTimeFormat("en-US", {
@@ -72,6 +81,8 @@ export default async function ArticleDetailPage({
   return (
     <main style={styles.main}>
       <SiteHeader />
+
+      <ArticleContentStyles />
 
       <div style={styles.container}>
         <div style={styles.subHeader}>
@@ -100,21 +111,16 @@ export default async function ArticleDetailPage({
             </p>
           </header>
 
-          <div style={styles.coverWrap}>
-            {article.cover_image ? (
+          {article.cover_image && (
+            <div style={styles.coverWrap}>
               <img
                 src={article.cover_image}
                 alt={article.title}
                 style={styles.coverImage}
               />
-            ) : (
-              <div style={styles.coverPlaceholder}>
-                TOKYO GUIDE
-              </div>
-            )}
-          </div>
+            </div>
+          )}
 
-          {/* ARTICLE CONTENT */}
           <div
             className="article-content"
             style={styles.content}
@@ -124,72 +130,94 @@ export default async function ArticleDetailPage({
           />
         </article>
 
-        <section style={styles.relatedSection}>
-          <div style={styles.relatedHeader}>
-            <div>
-              <p style={styles.relatedEyebrow}>
-                KEEP EXPLORING
-              </p>
+        {relatedArticles.length > 0 && (
+          <section style={styles.relatedSection}>
+            <div style={styles.relatedHeader}>
+              <div>
+                <p style={styles.relatedEyebrow}>
+                  KEEP EXPLORING
+                </p>
 
-              <h2 style={styles.relatedTitle}>
-                More articles
-              </h2>
+                <h2 style={styles.relatedTitle}>
+                  More articles
+                </h2>
+              </div>
+
+              <Link
+                href="/articles"
+                style={styles.allArticles}
+              >
+                All articles →
+              </Link>
             </div>
 
-            <Link
-              href="/articles"
-              style={styles.allArticles}
-            >
-              All articles →
-            </Link>
-          </div>
-
-          {relatedArticles.length > 0 ? (
             <div style={styles.relatedGrid}>
-              {relatedArticles.map((related) => (
-                <Link
-                  key={related.id}
-                  href={`/articles/${related.id}`}
-                  style={styles.relatedCard}
-                >
-                  <div style={styles.relatedImageWrap}>
-                    {related.cover_image ? (
-                      <img
-                        src={related.cover_image}
-                        alt={related.title}
-                        style={styles.relatedImage}
-                      />
-                    ) : (
-                      <div style={styles.relatedPlaceholder}>
-                        TOKYO GUIDE
-                      </div>
-                    )}
-                  </div>
+              {relatedArticles.map(
+                (related) => (
+                  <Link
+                    key={related.id}
+                    href={`/articles/${related.id}`}
+                    style={styles.relatedCard}
+                  >
+                    <div
+                      style={
+                        styles.relatedImageWrap
+                      }
+                    >
+                      {related.cover_image ? (
+                        <img
+                          src={
+                            related.cover_image
+                          }
+                          alt={related.title}
+                          style={
+                            styles.relatedImage
+                          }
+                        />
+                      ) : (
+                        <div
+                          style={
+                            styles.relatedPlaceholder
+                          }
+                        >
+                          TOKYO GUIDE
+                        </div>
+                      )}
+                    </div>
 
-                  <div style={styles.relatedBody}>
-                    {related.category && (
-                      <p style={styles.relatedCategory}>
-                        {related.category}
+                    <div
+                      style={styles.relatedBody}
+                    >
+                      {related.category && (
+                        <p
+                          style={
+                            styles.relatedCategory
+                          }
+                        >
+                          {related.category}
+                        </p>
+                      )}
+
+                      <h3
+                        style={
+                          styles.relatedCardTitle
+                        }
+                      >
+                        {related.title}
+                      </h3>
+
+                      <p
+                        style={styles.readMore}
+                      >
+                        Read article →
                       </p>
-                    )}
-
-                    <h3 style={styles.relatedCardTitle}>
-                      {related.title}
-                    </h3>
-
-                    <p style={styles.readMore}>
-                      Read article →
-                    </p>
-                  </div>
-                </Link>
-              ))}
+                    </div>
+                  </Link>
+                )
+              )}
             </div>
-          ) : (
-            <div style={styles.empty}>
-              More articles will be added soon.
-            </div>
-          )}
-        </section>
+          </section>
+        )}
       </div>
     </main>
   );
@@ -252,34 +280,18 @@ const styles = {
     aspectRatio: "16 / 8.5",
     overflow: "hidden",
     borderRadius: "18px",
-    background: "#f2e7e2",
   },
 
   coverImage: {
+    display: "block",
     width: "100%",
     height: "100%",
     objectFit: "cover" as const,
-    display: "block",
-  },
-
-  coverPlaceholder: {
-    width: "100%",
-    height: "100%",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    color: "#987a73",
-    fontFamily: "Georgia, serif",
-    fontSize: "11px",
-    letterSpacing: "3px",
   },
 
   content: {
     maxWidth: "720px",
     margin: "55px auto 0",
-    color: "#444",
-    fontSize: "16px",
-    lineHeight: 2,
   },
 
   relatedSection: {
@@ -325,26 +337,25 @@ const styles = {
   },
 
   relatedCard: {
-    display: "block",
-    color: "#222",
-    textDecoration: "none",
-    background: "#fff",
+    overflow: "hidden",
     border: "1px solid #e5ddd9",
     borderRadius: "15px",
-    overflow: "hidden",
+    background: "#fff",
+    color: "#222",
+    textDecoration: "none",
   },
 
   relatedImageWrap: {
     aspectRatio: "16 / 10",
-    background: "#f2e7e2",
     overflow: "hidden",
+    background: "#f2e7e2",
   },
 
   relatedImage: {
+    display: "block",
     width: "100%",
     height: "100%",
     objectFit: "cover" as const,
-    display: "block",
   },
 
   relatedPlaceholder: {
@@ -354,7 +365,6 @@ const styles = {
     alignItems: "center",
     justifyContent: "center",
     color: "#987a73",
-    fontFamily: "Georgia, serif",
     fontSize: "9px",
     letterSpacing: "2px",
   },
@@ -385,14 +395,4 @@ const styles = {
     color: "#777",
     fontSize: "10px",
   },
-
-  empty: {
-    padding: "45px 20px",
-    textAlign: "center" as const,
-    background: "#fff",
-    border: "1px solid #e7e0dc",
-    borderRadius: "15px",
-    color: "#999",
-    fontSize: "12px",
-  },
-} as const;
+};

@@ -1,4 +1,6 @@
 import Link from "next/link";
+
+import SiteHeader from "@/components/SiteHeader";
 import { supabase } from "@/lib/supabase";
 
 type Article = {
@@ -6,51 +8,27 @@ type Article = {
   title: string;
   category: string | null;
   cover_image: string | null;
-  content: string;
-  created_at: string;
 };
 
 export default async function ArticlesPage() {
-  const { data: articles, error } = await supabase
+  const { data, error } = await supabase
     .from("articles")
     .select(
-      "id, title, category, cover_image, content, created_at"
+      "id, title, category, cover_image"
     )
     .eq("status", "published")
     .order("created_at", {
       ascending: false,
     });
 
-  if (error) {
-    return (
-      <main style={styles.main}>
-        <div style={styles.container}>
-          <p style={styles.eyebrow}>
-            ARTICLES
-          </p>
-
-          <h1 style={styles.title}>
-            Articles
-          </h1>
-
-          <p style={styles.error}>
-            Articles could not be loaded.
-          </p>
-        </div>
-      </main>
-    );
-  }
-
-  const publishedArticles =
-    (articles ?? []) as Article[];
+  const articles =
+    (data ?? []) as Article[];
 
   return (
     <main style={styles.main}>
-      <div style={styles.container}>
-        {/* =========================
-            Header
-        ========================== */}
+      <SiteHeader />
 
+      <div style={styles.container}>
         <header style={styles.header}>
           <p style={styles.eyebrow}>
             TOKYO GUIDE / ARTICLES
@@ -61,15 +39,16 @@ export default async function ArticlesPage() {
           </h1>
 
           <p style={styles.description}>
-            Stories, guides and ideas for discovering the cute side of Japan.
+            Stories, guides and ideas for
+            discovering the cute side of Japan.
           </p>
         </header>
 
-        {/* =========================
-            Empty
-        ========================== */}
-
-        {publishedArticles.length === 0 ? (
+        {error ? (
+          <p style={styles.message}>
+            Articles could not be loaded.
+          </p>
+        ) : articles.length === 0 ? (
           <section style={styles.empty}>
             <h2 style={styles.emptyTitle}>
               No articles yet
@@ -80,50 +59,44 @@ export default async function ArticlesPage() {
             </p>
           </section>
         ) : (
-          /* =========================
-             Article Grid
-          ========================== */
-
           <section style={styles.grid}>
-            {publishedArticles.map(
-              (article) => (
-                <Link
-                  key={article.id}
-                  href={`/articles/${article.id}`}
-                  style={styles.card}
-                >
-                  <div style={styles.imageWrap}>
-                    {article.cover_image ? (
-                      <img
-                        src={article.cover_image}
-                        alt={article.title}
-                        style={styles.image}
-                      />
-                    ) : (
-                      <div style={styles.imagePlaceholder}>
-                        TOKYO GUIDE
-                      </div>
-                    )}
-                  </div>
+            {articles.map((article) => (
+              <Link
+                key={article.id}
+                href={`/articles/${article.id}`}
+                style={styles.card}
+              >
+                <div style={styles.imageWrap}>
+                  {article.cover_image ? (
+                    <img
+                      src={article.cover_image}
+                      alt={article.title}
+                      style={styles.image}
+                    />
+                  ) : (
+                    <div style={styles.placeholder}>
+                      TOKYO GUIDE
+                    </div>
+                  )}
+                </div>
 
-                  <div style={styles.cardBody}>
-                    {article.category && (
-                      <div style={styles.category}>
-                        {article.category}
-                      </div>
-                    )}
-
-                    <h2 style={styles.cardTitle}>
-                      {article.title}
-                    </h2>
-
-                    <p style={styles.readMore}>
-                      Read article →
+                <div style={styles.cardBody}>
+                  {article.category && (
+                    <p style={styles.category}>
+                      {article.category}
                     </p>
-                  </div>
-                </Link>
-              )
-            )}
+                  )}
+
+                  <h2 style={styles.cardTitle}>
+                    {article.title}
+                  </h2>
+
+                  <p style={styles.readMore}>
+                    Read article →
+                  </p>
+                </div>
+              </Link>
+            ))}
           </section>
         )}
       </div>
@@ -131,21 +104,17 @@ export default async function ArticlesPage() {
   );
 }
 
-/* =========================
-   Styles
-========================= */
-
 const styles = {
   main: {
     minHeight: "100vh",
     background: "#faf8f6",
     color: "#222",
-    padding: "60px 24px 100px",
   },
 
   container: {
     maxWidth: "1180px",
     margin: "0 auto",
+    padding: "60px 24px 100px",
   },
 
   header: {
@@ -166,7 +135,6 @@ const styles = {
     fontFamily: "Georgia, serif",
     fontSize: "52px",
     fontWeight: 400,
-    lineHeight: 1.15,
   },
 
   description: {
@@ -184,11 +152,10 @@ const styles = {
   },
 
   card: {
-    display: "block",
-    background: "#fff",
+    overflow: "hidden",
     border: "1px solid #e8e1dd",
     borderRadius: "16px",
-    overflow: "hidden",
+    background: "#fff",
     color: "#222",
     textDecoration: "none",
   },
@@ -207,7 +174,7 @@ const styles = {
     objectFit: "cover" as const,
   },
 
-  imagePlaceholder: {
+  placeholder: {
     width: "100%",
     height: "100%",
     display: "flex",
@@ -215,7 +182,6 @@ const styles = {
     justifyContent: "center",
     color: "#aaa",
     fontSize: "10px",
-    fontWeight: 700,
     letterSpacing: "3px",
   },
 
@@ -224,7 +190,7 @@ const styles = {
   },
 
   category: {
-    marginBottom: "8px",
+    margin: "0 0 8px",
     color: "#c8647b",
     fontSize: "10px",
     fontWeight: 700,
@@ -248,10 +214,10 @@ const styles = {
 
   empty: {
     padding: "70px 20px",
-    textAlign: "center" as const,
-    background: "#fff",
     border: "1px solid #e8e1dd",
     borderRadius: "16px",
+    background: "#fff",
+    textAlign: "center" as const,
   },
 
   emptyTitle: {
@@ -264,11 +230,9 @@ const styles = {
   emptyText: {
     margin: "10px 0 0",
     color: "#777",
-    fontSize: "13px",
   },
 
-  error: {
-    marginTop: "25px",
+  message: {
     color: "#a44",
   },
 };
