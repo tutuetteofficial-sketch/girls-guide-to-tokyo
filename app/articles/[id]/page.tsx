@@ -3,8 +3,6 @@ import { notFound } from "next/navigation";
 
 import SiteHeader from "@/components/SiteHeader";
 
-import ArticleContentStyles from "@/components/article-folder/ArticleContentStyles";
-
 import { supabase } from "@/lib/supabase";
 
 type Article = {
@@ -82,7 +80,7 @@ export default async function ArticleDetailPage({
     <main style={styles.main}>
       <SiteHeader />
 
-      <ArticleContentStyles />
+    
 
       <div style={styles.container}>
         <div style={styles.subHeader}>
