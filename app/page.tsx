@@ -160,7 +160,7 @@ export default async function HomePage() {
           <SectionHeader
             eyebrow="WHAT TO EAT"
             title="Food"
-            href="/foods"
+            href="/food"
           />
 
           <div style={styles.gridFour}>
@@ -170,7 +170,7 @@ export default async function HomePage() {
               foods.map((food) => (
                 <Link
                   key={food.id}
-                  href={`/foods/${food.id}`}
+                  href={`/food/${food.id}`}
                   style={styles.card}
                 >
                   <div style={styles.imageWrapper}>

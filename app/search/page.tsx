@@ -272,7 +272,7 @@ export default async function SearchPage({
                     {foods.map((food) => (
                       <SearchCard
                         key={food.id}
-                        href={`/foods/${food.id}`}
+                        href={`/food/${food.id}`}
                         type="FOOD"
                         title={food.name}
                         imageUrl={food.image_url}

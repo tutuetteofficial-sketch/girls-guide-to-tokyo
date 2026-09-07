@@ -23,7 +23,7 @@ export default function Header() {
             Places
           </Link>
 
-          <Link href="/foods" style={styles.navLink}>
+          <Link href="/food" style={styles.navLink}>
             Food
           </Link>
 
@@ -59,7 +59,7 @@ export default function Header() {
           </Link>
 
           <Link
-            href="/foods"
+            href="/food"
             onClick={() => setMenuOpen(false)}
           >
             Food

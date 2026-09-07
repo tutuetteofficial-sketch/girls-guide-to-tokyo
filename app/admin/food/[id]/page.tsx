@@ -1571,14 +1571,14 @@ export default function EditFoodPage() {
           style={styles.topbar}
         >
           <Link
-            href="/admin/foods"
+            href="/admin/food"
             style={styles.back}
           >
             ← Foods
           </Link>
 
           <Link
-            href={`/foods/${foodId}`}
+            href={`/food/${foodId}`}
             target="_blank"
             rel="noopener noreferrer"
             style={styles.preview}

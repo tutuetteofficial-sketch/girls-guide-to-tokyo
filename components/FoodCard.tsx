@@ -24,7 +24,7 @@ export default function FoodCard({
 
   return (
     <Link
-      href={`/foods/${id}`}
+      href={`/food/${id}`}
       style={styles.card}
     >
       <div style={styles.image}>

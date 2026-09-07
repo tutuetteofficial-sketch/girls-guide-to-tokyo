@@ -295,7 +295,7 @@ export default async function FoodDetailPage({
       <div style={styles.container}>
         <div style={styles.subHeader}>
           <Link
-            href="/foods"
+            href="/food"
             style={styles.back}
           >
             ← Food
