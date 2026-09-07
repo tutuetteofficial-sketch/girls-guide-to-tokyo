@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
+import SiteHeader from "@/components/SiteHeader";
 
 type Product = {
   id: string;
@@ -280,7 +280,7 @@ export default async function ProductDetailPage({
 
   return (
     <main style={styles.main}>
-      <Header />
+      <SiteHeader />
 
       <div
         style={styles.container}

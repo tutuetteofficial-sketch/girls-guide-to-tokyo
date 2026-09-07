@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
+import SiteHeader from "@/components/SiteHeader";
 
 type Food = {
   id: string;
@@ -290,7 +290,7 @@ export default async function FoodDetailPage({
 
   return (
     <main style={styles.main}>
-      <Header />
+      <SiteHeader />
 
       <div style={styles.container}>
         <div style={styles.subHeader}>

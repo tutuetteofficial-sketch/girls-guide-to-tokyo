@@ -1,9 +1,9 @@
 "use client";
 
 import Link from "next/link";
-import Header from "@/components/Header";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
+import SiteHeader from "@/components/SiteHeader";
 
 type Product = {
   id: string;
@@ -130,7 +130,7 @@ export default function ProductsPage() {
 
   return (
     <main style={styles.main}>
-      <Header />
+      <SiteHeader />
 
       <div style={styles.container}>
         <header style={styles.header}>

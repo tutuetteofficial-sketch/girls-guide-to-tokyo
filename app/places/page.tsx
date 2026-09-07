@@ -2,9 +2,9 @@
 
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
-import Header from "@/components/Header";
 import PlaceCard from "@/components/PlaceCard";
 import { supabase } from "@/lib/supabase";
+import SiteHeader from "@/components/SiteHeader";
 
 type Region = {
   id: number;
@@ -441,7 +441,7 @@ export default function PlacesPage() {
 
   return (
     <main style={styles.main}>
-      <Header />
+      <SiteHeader />
 
       <div
         className="places-main"

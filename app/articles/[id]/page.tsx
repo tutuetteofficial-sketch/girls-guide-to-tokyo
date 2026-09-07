@@ -1,6 +1,6 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import Header from "@/components/Header";
+import SiteHeader from "@/components/SiteHeader";
 import { supabase } from "@/lib/supabase";
 
 type Article = {
@@ -71,7 +71,7 @@ export default async function ArticleDetailPage({
 
   return (
     <main style={styles.main}>
-      <Header />
+      <SiteHeader />
 
       <div style={styles.container}>
         <div style={styles.subHeader}>

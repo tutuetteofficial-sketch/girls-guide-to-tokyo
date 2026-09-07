@@ -1,6 +1,6 @@
 import Link from "next/link";
-import Header from "@/components/Header";
 import { supabase } from "@/lib/supabase";
+import SiteHeader from "@/components/SiteHeader";
 
 type SearchParams = {
   q?: string;
@@ -147,7 +147,7 @@ export default async function SearchPage({
 
   return (
     <main style={styles.main}>
-      <Header />
+      <SiteHeader />
 
       <div style={styles.container}>
         <header style={styles.header}>
