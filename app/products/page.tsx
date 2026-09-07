@@ -3,7 +3,6 @@
 import Link from "next/link";
 import { useEffect, useMemo, useState } from "react";
 import { supabase } from "@/lib/supabase";
-import SiteHeader from "@/components/SiteHeader";
 
 type Product = {
   id: string;
@@ -130,7 +129,6 @@ export default function ProductsPage() {
 
   return (
     <main style={styles.main}>
-      <SiteHeader />
 
       <div style={styles.container}>
         <header style={styles.header}>

@@ -1,4 +1,3 @@
-import SiteHeader from "@/components/SiteHeader";
 import FoodCard from "@/components/FoodCard";
 import { supabase } from "@/lib/supabase";
 
@@ -64,7 +63,7 @@ export default async function FoodsPage() {
 
   return (
     <main style={styles.main}>
-      <SiteHeader />
+
 
       <div style={styles.container}>
         {/* =========================
