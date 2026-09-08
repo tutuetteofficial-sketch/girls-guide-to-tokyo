@@ -236,7 +236,7 @@ export default function AdminDashboard() {
     {
       label: "Foods",
       value: counts.foods,
-      href: "/admin/foods",
+      href: "/admin/food",
     },
     {
       label: "Products",
@@ -340,7 +340,7 @@ export default function AdminDashboard() {
             </Link>
 
             <Link
-              href="/admin/foods/new"
+              href="/admin/food/new"
               style={styles.actionCard}
             >
               <span style={styles.actionPlus}>+</span>
@@ -426,7 +426,7 @@ export default function AdminDashboard() {
             </h2>
 
             <Link
-              href="/admin/foods"
+              href="/admin/food"
               style={styles.viewAll}
             >
               View all →
@@ -447,7 +447,7 @@ export default function AdminDashboard() {
             ) : (
               recentFoods.map((food) => (
                 <Link
-                  href={`/admin/foods/${food.id}`}
+                  href={`/admin/food/${food.id}`}
                   key={food.id}
                   style={styles.tableRowThree}
                 >
@@ -529,6 +529,14 @@ export default function AdminDashboard() {
               style={styles.manageLink}
             >
               <span>Places</span>
+              <span>→</span>
+            </Link>
+
+            <Link
+              href="/admin/food"
+              style={styles.manageLink}
+            >
+              <span>Foods</span>
               <span>→</span>
             </Link>
 
