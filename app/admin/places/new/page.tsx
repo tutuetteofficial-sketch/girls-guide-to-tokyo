@@ -1,13 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { createClient } from "@supabase/supabase-js";
-
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+import { supabase } from "@/lib/supabase";
 
 type PlaceType = {
   id: number;
@@ -21,8 +17,8 @@ type Region = {
 
 type Area = {
   id: number;
-  name: string;
   region_id: number;
+  name: string;
 };
 
 type Station = {
@@ -35,6 +31,7 @@ export default function NewPlacePage() {
 
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [errorMessage, setErrorMessage] = useState("");
 
   const [siteId, setSiteId] = useState("");
 
@@ -78,140 +75,131 @@ export default function NewPlacePage() {
 
   const [imageUrl, setImageUrl] = useState("");
 
+  const [stationId, setStationId] = useState("");
+  const [stationExit, setStationExit] = useState("");
+  const [walkMinutes, setWalkMinutes] = useState("");
+
   const [status, setStatus] = useState("draft");
 
-  const [selectedStations, setSelectedStations] = useState<
-    {
-      station_id: string;
-      station_exit: string;
-      walk_minutes: string;
-    }[]
-  >([]);
-
   useEffect(() => {
-    loadMasterData();
+    loadInitialData();
   }, []);
 
-  async function loadMasterData() {
+  async function loadInitialData() {
     setLoading(true);
+    setErrorMessage("");
 
-    const [
-      siteResult,
-      placeTypeResult,
-      regionResult,
-      areaResult,
-      stationResult,
-    ] = await Promise.all([
-      supabase
-        .from("sites")
-        .select("id")
-        .eq("slug", "tokyo-guide")
-        .single(),
+    const { data: site, error: siteError } = await supabase
+      .from("sites")
+      .select("id")
+      .eq("slug", "tokyo-guide")
+      .single();
 
-      supabase
-        .from("place_types")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("sort_order"),
-
-      supabase
-        .from("regions")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("sort_order"),
-
-      supabase
-        .from("areas")
-        .select("id, name, region_id")
-        .eq("is_active", true)
-        .order("sort_order"),
-
-      supabase
-        .from("stations")
-        .select("id, name")
-        .eq("is_active", true)
-        .order("name"),
-    ]);
-
-    if (siteResult.error) {
-      alert(siteResult.error.message);
+    if (siteError || !site) {
+      setErrorMessage(
+        siteError?.message ||
+          "TOKYO GUIDE site could not be found."
+      );
       setLoading(false);
       return;
     }
 
-    setSiteId(siteResult.data.id);
+    setSiteId(site.id);
 
-    if (!placeTypeResult.error) {
-      setPlaceTypes(placeTypeResult.data || []);
+    const [
+      placeTypesResult,
+      regionsResult,
+      stationsResult,
+    ] = await Promise.all([
+      supabase
+        .from("place_types")
+        .select("id, name")
+        .eq("site_id", site.id)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true }),
+
+      supabase
+        .from("regions")
+        .select("id, name")
+        .eq("site_id", site.id)
+        .eq("is_active", true)
+        .order("sort_order", { ascending: true }),
+
+      supabase
+        .from("stations")
+        .select("id, name")
+        .eq("site_id", site.id)
+        .eq("is_active", true)
+        .order("name", { ascending: true }),
+    ]);
+
+    const firstError =
+      placeTypesResult.error ||
+      regionsResult.error ||
+      stationsResult.error;
+
+    if (firstError) {
+      setErrorMessage(firstError.message);
+      setLoading(false);
+      return;
     }
 
-    if (!regionResult.error) {
-      setRegions(regionResult.data || []);
-    }
-
-    if (!areaResult.error) {
-      setAreas(areaResult.data || []);
-    }
-
-    if (!stationResult.error) {
-      setStations(stationResult.data || []);
-    }
+    setPlaceTypes(placeTypesResult.data ?? []);
+    setRegions(regionsResult.data ?? []);
+    setStations(stationsResult.data ?? []);
 
     setLoading(false);
   }
 
-  const filteredAreas = regionId
-    ? areas.filter((area) => area.region_id === Number(regionId))
-    : [];
-
-  function addStation() {
-    setSelectedStations([
-      ...selectedStations,
-      {
-        station_id: "",
-        station_exit: "",
-        walk_minutes: "",
-      },
-    ]);
-  }
-
-  function updateStation(
-    index: number,
-    field: "station_id" | "station_exit" | "walk_minutes",
-    value: string
+  async function handleRegionChange(
+    newRegionId: string
   ) {
-    const updated = [...selectedStations];
+    setRegionId(newRegionId);
+    setAreaId("");
+    setAreas([]);
 
-    updated[index] = {
-      ...updated[index],
-      [field]: value,
-    };
+    if (!newRegionId) return;
 
-    setSelectedStations(updated);
+    const { data, error } = await supabase
+      .from("areas")
+      .select("id, region_id, name")
+      .eq("region_id", Number(newRegionId))
+      .eq("is_active", true)
+      .order("sort_order", { ascending: true });
+
+    if (error) {
+      setErrorMessage(error.message);
+      return;
+    }
+
+    setAreas(data ?? []);
   }
 
-  function removeStation(index: number) {
-    setSelectedStations(
-      selectedStations.filter((_, i) => i !== index)
-    );
+  function createSlug(value: string) {
+    return value
+      .toLowerCase()
+      .trim()
+      .replace(/[^a-z0-9\s-]/g, "")
+      .replace(/\s+/g, "-")
+      .replace(/-+/g, "-");
   }
 
-  async function handleSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function handleSave() {
+    setErrorMessage("");
 
     if (!name.trim()) {
-      alert("Place name is required.");
+      setErrorMessage("Please enter a Place Name.");
       return;
     }
 
     if (!siteId) {
-      alert("Site information could not be loaded.");
+      setErrorMessage("Site information could not be loaded.");
       return;
     }
 
     setSaving(true);
 
-    const { data: place, error: placeError } = await supabase
+    const { data: newPlace, error } = await supabase
       .from("places")
       .insert({
         site_id: siteId,
@@ -229,6 +217,7 @@ export default function NewPlacePage() {
           : null,
 
         name: name.trim(),
+        slug: createSlug(name),
 
         description: description || null,
         editor_note: editorNote || null,
@@ -266,488 +255,618 @@ export default function NewPlacePage() {
 
         status,
       })
-      .select()
+      .select("id")
       .single();
 
-    if (placeError) {
-      alert(placeError.message);
+    if (error || !newPlace) {
+      setErrorMessage(
+        error?.message ||
+          "Failed to save the place."
+      );
       setSaving(false);
       return;
     }
 
-    const accessRows = selectedStations
-      .filter((station) => station.station_id)
-      .map((station, index) => ({
-        place_id: place.id,
-        station_id: Number(station.station_id),
-        station_exit: station.station_exit || null,
-        walk_minutes: station.walk_minutes
-          ? Number(station.walk_minutes)
-          : null,
-        sort_order: index,
-      }));
-
-    if (accessRows.length > 0) {
+    if (stationId) {
       const { error: accessError } = await supabase
         .from("place_access")
-        .insert(accessRows);
+        .insert({
+          place_id: newPlace.id,
+          station_id: Number(stationId),
+          station_exit: stationExit || null,
+          walk_minutes: walkMinutes
+            ? Number(walkMinutes)
+            : null,
+        });
 
       if (accessError) {
-        alert(accessError.message);
+        setErrorMessage(
+          `Place was saved, but station information could not be saved: ${accessError.message}`
+        );
         setSaving(false);
         return;
       }
     }
 
-    router.push(`/admin/places/${place.id}`);
+    router.push(`/admin/places/${newPlace.id}`);
+    router.refresh();
   }
 
   if (loading) {
     return (
-      <main style={{ padding: "40px" }}>
-        Loading...
+      <main style={styles.page}>
+        <p>Loading...</p>
       </main>
     );
   }
 
   return (
-    <main
-      style={{
-        maxWidth: "900px",
-        margin: "0 auto",
-        padding: "40px 24px 80px",
-      }}
-    >
-      <h1>Add Place</h1>
+    <main style={styles.page}>
+      <div style={styles.container}>
+        <div style={styles.top}>
+          <div>
+            <Link
+              href="/admin/places"
+              style={styles.backLink}
+            >
+              ← Places
+            </Link>
 
-      <p style={{ color: "#666", marginBottom: "32px" }}>
-        Register a restaurant, shop, sightseeing spot, or other place.
-      </p>
+            <h1 style={styles.title}>
+              Add New Place
+            </h1>
 
-      <form onSubmit={handleSubmit}>
+            <p style={styles.subtitle}>
+              Register a restaurant, shop, sightseeing spot, or other place.
+            </p>
+          </div>
+
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              ...styles.saveButton,
+              opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? "Saving..." : "Save Place"}
+          </button>
+        </div>
+
+        {errorMessage && (
+          <div style={styles.error}>
+            {errorMessage}
+          </div>
+        )}
+
         {/* BASIC INFORMATION */}
 
-        <Section title="Basic Information">
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>
+            Basic Information
+          </h2>
 
-          <Field label="Place Name *">
-            <input
-              value={name}
-              onChange={(e) => setName(e.target.value)}
-              required
-            />
-          </Field>
+          <div style={styles.grid}>
+            <div style={styles.fullWidth}>
+              <label style={styles.label}>
+                Place Name *
+              </label>
 
-          <Field label="Type">
-            <select
-              value={placeTypeId}
-              onChange={(e) =>
-                setPlaceTypeId(e.target.value)
-              }
-            >
-              <option value="">Select type</option>
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="e.g. Senso-ji Temple"
+                style={styles.input}
+              />
+            </div>
 
-              {placeTypes.map((type) => (
-                <option
-                  key={type.id}
-                  value={type.id}
-                >
-                  {type.name}
+            <div>
+              <label style={styles.label}>
+                Type
+              </label>
+
+              <select
+                value={placeTypeId}
+                onChange={(e) =>
+                  setPlaceTypeId(e.target.value)
+                }
+                style={styles.input}
+              >
+                <option value="">
+                  Select type
                 </option>
-              ))}
-            </select>
-          </Field>
 
-          <Field label="Region">
-            <select
-              value={regionId}
-              onChange={(e) => {
-                setRegionId(e.target.value);
-                setAreaId("");
-              }}
-            >
-              <option value="">Select region</option>
+                {placeTypes.map((type) => (
+                  <option
+                    key={type.id}
+                    value={type.id}
+                  >
+                    {type.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-              {regions.map((region) => (
-                <option
-                  key={region.id}
-                  value={region.id}
-                >
-                  {region.name}
+            <div>
+              <label style={styles.label}>
+                Region
+              </label>
+
+              <select
+                value={regionId}
+                onChange={(e) =>
+                  handleRegionChange(e.target.value)
+                }
+                style={styles.input}
+              >
+                <option value="">
+                  Select region
                 </option>
-              ))}
-            </select>
-          </Field>
 
-          <Field label="Area">
-            <select
-              value={areaId}
-              onChange={(e) =>
-                setAreaId(e.target.value)
-              }
-              disabled={!regionId}
-            >
-              <option value="">Select area</option>
+                {regions.map((region) => (
+                  <option
+                    key={region.id}
+                    value={region.id}
+                  >
+                    {region.name}
+                  </option>
+                ))}
+              </select>
+            </div>
 
-              {filteredAreas.map((area) => (
-                <option
-                  key={area.id}
-                  value={area.id}
-                >
-                  {area.name}
+            <div>
+              <label style={styles.label}>
+                Area
+              </label>
+
+              <select
+                value={areaId}
+                onChange={(e) =>
+                  setAreaId(e.target.value)
+                }
+                disabled={!regionId}
+                style={{
+                  ...styles.input,
+                  opacity: regionId ? 1 : 0.5,
+                }}
+              >
+                <option value="">
+                  {regionId
+                    ? "Select area"
+                    : "Select region first"}
                 </option>
-              ))}
-            </select>
-          </Field>
 
-          <Field label="Description">
+                {areas.map((area) => (
+                  <option
+                    key={area.id}
+                    value={area.id}
+                  >
+                    {area.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+
+          <div style={styles.fullWidth}>
+            <label style={styles.label}>
+              Description
+            </label>
+
             <textarea
               value={description}
               onChange={(e) =>
                 setDescription(e.target.value)
               }
-              rows={5}
+              placeholder="Write the description shown to visitors..."
+              style={styles.textarea}
             />
-          </Field>
+          </div>
 
-          <Field label="Editor Note">
+          <div style={styles.fullWidth}>
+            <label style={styles.label}>
+              Editor Note
+            </label>
+
             <textarea
               value={editorNote}
               onChange={(e) =>
                 setEditorNote(e.target.value)
               }
-              rows={4}
+              placeholder="Private editorial notes..."
+              style={styles.textarea}
             />
-          </Field>
+          </div>
+        </section>
 
-        </Section>
+        {/* LOCATION */}
 
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>
+            Location
+          </h2>
 
-        {/* ADDRESS */}
+          <div style={styles.grid}>
+            <div>
+              <label style={styles.label}>
+                Postal Code
+              </label>
 
-        <Section title="Location">
+              <input
+                value={postalCode}
+                onChange={(e) =>
+                  setPostalCode(e.target.value)
+                }
+                placeholder="e.g. 111-0032"
+                style={styles.input}
+              />
+            </div>
 
-          <Field label="Postal Code">
-            <input
-              value={postalCode}
-              onChange={(e) =>
-                setPostalCode(e.target.value)
-              }
-            />
-          </Field>
+            <div>
+              <label style={styles.label}>
+                Google Maps URL
+              </label>
 
-          <Field label="Address">
-            <input
-              value={address}
-              onChange={(e) =>
-                setAddress(e.target.value)
-              }
-            />
-          </Field>
+              <input
+                value={googleMapsUrl}
+                onChange={(e) =>
+                  setGoogleMapsUrl(e.target.value)
+                }
+                placeholder="https://..."
+                style={styles.input}
+              />
+            </div>
 
-          <Field label="Google Maps URL">
-            <input
-              type="url"
-              value={googleMapsUrl}
-              onChange={(e) =>
-                setGoogleMapsUrl(e.target.value)
-              }
-            />
-          </Field>
+            <div style={styles.fullWidth}>
+              <label style={styles.label}>
+                Address
+              </label>
 
-        </Section>
-
+              <input
+                value={address}
+                onChange={(e) =>
+                  setAddress(e.target.value)
+                }
+                placeholder="Full address"
+                style={styles.input}
+              />
+            </div>
+          </div>
+        </section>
 
         {/* ACCESS */}
 
-        <Section title="Access / Nearest Station">
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>
+            Access
+          </h2>
 
-          {selectedStations.map((station, index) => (
-            <div
-              key={index}
-              style={{
-                border: "1px solid #ddd",
-                padding: "16px",
-                borderRadius: "8px",
-                marginBottom: "12px",
-              }}
-            >
-              <Field label="Station">
-                <select
-                  value={station.station_id}
-                  onChange={(e) =>
-                    updateStation(
-                      index,
-                      "station_id",
-                      e.target.value
-                    )
-                  }
-                >
-                  <option value="">
-                    Select station
-                  </option>
+          <div style={styles.grid}>
+            <div>
+              <label style={styles.label}>
+                Nearest Station
+              </label>
 
-                  {stations.map((s) => (
-                    <option
-                      key={s.id}
-                      value={s.id}
-                    >
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Exit">
-                <input
-                  value={station.station_exit}
-                  onChange={(e) =>
-                    updateStation(
-                      index,
-                      "station_exit",
-                      e.target.value
-                    )
-                  }
-                />
-              </Field>
-
-              <Field label="Walk Minutes">
-                <input
-                  type="number"
-                  min="0"
-                  value={station.walk_minutes}
-                  onChange={(e) =>
-                    updateStation(
-                      index,
-                      "walk_minutes",
-                      e.target.value
-                    )
-                  }
-                />
-              </Field>
-
-              <button
-                type="button"
-                onClick={() =>
-                  removeStation(index)
+              <select
+                value={stationId}
+                onChange={(e) =>
+                  setStationId(e.target.value)
                 }
+                style={styles.input}
               >
-                Remove
-              </button>
+                <option value="">
+                  Select station
+                </option>
+
+                {stations.map((station) => (
+                  <option
+                    key={station.id}
+                    value={station.id}
+                  >
+                    {station.name}
+                  </option>
+                ))}
+              </select>
             </div>
-          ))}
 
-          <button
-            type="button"
-            onClick={addStation}
-          >
-            + Add Station
-          </button>
+            <div>
+              <label style={styles.label}>
+                Station Exit
+              </label>
 
-        </Section>
+              <input
+                value={stationExit}
+                onChange={(e) =>
+                  setStationExit(e.target.value)
+                }
+                placeholder="e.g. Exit A1"
+                style={styles.input}
+              />
+            </div>
 
+            <div>
+              <label style={styles.label}>
+                Walk Minutes
+              </label>
+
+              <input
+                type="number"
+                min="0"
+                value={walkMinutes}
+                onChange={(e) =>
+                  setWalkMinutes(e.target.value)
+                }
+                placeholder="e.g. 5"
+                style={styles.input}
+              />
+            </div>
+          </div>
+        </section>
 
         {/* CONTACT */}
 
-        <Section title="Contact">
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>
+            Contact & Website
+          </h2>
 
-          <Field label="Phone">
-            <input
-              value={phone}
-              onChange={(e) =>
-                setPhone(e.target.value)
-              }
-            />
-          </Field>
+          <div style={styles.grid}>
+            <div>
+              <label style={styles.label}>
+                Phone
+              </label>
 
-          <Field label="Official Website">
-            <input
-              type="url"
-              value={officialUrl}
-              onChange={(e) =>
-                setOfficialUrl(e.target.value)
-              }
-            />
-          </Field>
+              <input
+                value={phone}
+                onChange={(e) =>
+                  setPhone(e.target.value)
+                }
+                style={styles.input}
+              />
+            </div>
 
-          <Field label="Instagram">
-            <input
-              type="url"
-              value={instagramUrl}
-              onChange={(e) =>
-                setInstagramUrl(e.target.value)
-              }
-            />
-          </Field>
+            <div>
+              <label style={styles.label}>
+                Official Website
+              </label>
 
-          <Field label="Tabelog">
-            <input
-              type="url"
-              value={tabelogUrl}
-              onChange={(e) =>
-                setTabelogUrl(e.target.value)
-              }
-            />
-          </Field>
+              <input
+                value={officialUrl}
+                onChange={(e) =>
+                  setOfficialUrl(e.target.value)
+                }
+                placeholder="https://..."
+                style={styles.input}
+              />
+            </div>
 
-        </Section>
+            <div>
+              <label style={styles.label}>
+                Instagram
+              </label>
 
+              <input
+                value={instagramUrl}
+                onChange={(e) =>
+                  setInstagramUrl(e.target.value)
+                }
+                placeholder="https://instagram.com/..."
+                style={styles.input}
+              />
+            </div>
 
-        {/* BUSINESS INFORMATION */}
+            <div>
+              <label style={styles.label}>
+                Tabelog
+              </label>
 
-        <Section title="Business Information">
+              <input
+                value={tabelogUrl}
+                onChange={(e) =>
+                  setTabelogUrl(e.target.value)
+                }
+                placeholder="https://..."
+                style={styles.input}
+              />
+            </div>
+          </div>
+        </section>
 
-          <Field label="Price Range">
-            <input
-              value={priceRange}
-              onChange={(e) =>
-                setPriceRange(e.target.value)
-              }
-              placeholder="¥¥"
-            />
-          </Field>
+        {/* STORE INFORMATION */}
 
-          <Field label="Seats">
-            <input
-              type="number"
-              min="0"
-              value={seats}
-              onChange={(e) =>
-                setSeats(e.target.value)
-              }
-            />
-          </Field>
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>
+            Store Information
+          </h2>
 
-          <Field label="Counter Seats">
-            <input
-              type="number"
-              min="0"
-              value={counterSeats}
-              onChange={(e) =>
-                setCounterSeats(e.target.value)
-              }
-            />
-          </Field>
+          <div style={styles.grid}>
+            <div>
+              <label style={styles.label}>
+                Price Range
+              </label>
 
-          <Field label="Table Seats">
-            <input
-              type="number"
-              min="0"
-              value={tableSeats}
-              onChange={(e) =>
-                setTableSeats(e.target.value)
-              }
-            />
-          </Field>
+              <input
+                value={priceRange}
+                onChange={(e) =>
+                  setPriceRange(e.target.value)
+                }
+                placeholder="e.g. ¥1,000–¥2,000"
+                style={styles.input}
+              />
+            </div>
 
-          <Field label="Reservation">
-            <input
-              value={reservation}
-              onChange={(e) =>
-                setReservation(e.target.value)
-              }
-            />
-          </Field>
+            <div>
+              <label style={styles.label}>
+                Reservation
+              </label>
 
-          <Field label="English Support">
-            <input
-              value={englishSupport}
-              onChange={(e) =>
-                setEnglishSupport(e.target.value)
-              }
-            />
-          </Field>
+              <input
+                value={reservation}
+                onChange={(e) =>
+                  setReservation(e.target.value)
+                }
+                placeholder="e.g. Recommended"
+                style={styles.input}
+              />
+            </div>
 
-          <label
-            style={{
-              display: "flex",
-              gap: "8px",
-              marginTop: "16px",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={card}
-              onChange={(e) =>
-                setCard(e.target.checked)
-              }
-            />
+            <div>
+              <label style={styles.label}>
+                English Support
+              </label>
 
-            Credit Cards Accepted
-          </label>
+              <input
+                value={englishSupport}
+                onChange={(e) =>
+                  setEnglishSupport(e.target.value)
+                }
+                placeholder="e.g. English menu available"
+                style={styles.input}
+              />
+            </div>
 
-          <label
-            style={{
-              display: "flex",
-              gap: "8px",
-              marginTop: "12px",
-            }}
-          >
-            <input
-              type="checkbox"
-              checked={taxFree}
-              onChange={(e) =>
-                setTaxFree(e.target.checked)
-              }
-            />
+            <div>
+              <label style={styles.label}>
+                Opening Hours
+              </label>
 
-            Tax Free
-          </label>
+              <input
+                value={openingHours}
+                onChange={(e) =>
+                  setOpeningHours(e.target.value)
+                }
+                placeholder="e.g. 10:00–20:00"
+                style={styles.input}
+              />
+            </div>
 
-        </Section>
+            <div>
+              <label style={styles.label}>
+                Closed Days
+              </label>
 
+              <input
+                value={closedDays}
+                onChange={(e) =>
+                  setClosedDays(e.target.value)
+                }
+                placeholder="e.g. Monday"
+                style={styles.input}
+              />
+            </div>
+          </div>
 
-        {/* OPENING HOURS */}
+          <div style={styles.grid}>
+            <div>
+              <label style={styles.label}>
+                Total Seats
+              </label>
 
-        <Section title="Opening Hours">
+              <input
+                type="number"
+                value={seats}
+                onChange={(e) =>
+                  setSeats(e.target.value)
+                }
+                style={styles.input}
+              />
+            </div>
 
-          <Field label="Opening Hours">
-            <textarea
-              value={openingHours}
-              onChange={(e) =>
-                setOpeningHours(e.target.value)
-              }
-              rows={4}
-            />
-          </Field>
+            <div>
+              <label style={styles.label}>
+                Counter Seats
+              </label>
 
-          <Field label="Closed Days">
-            <input
-              value={closedDays}
-              onChange={(e) =>
-                setClosedDays(e.target.value)
-              }
-            />
-          </Field>
+              <input
+                type="number"
+                value={counterSeats}
+                onChange={(e) =>
+                  setCounterSeats(e.target.value)
+                }
+                style={styles.input}
+              />
+            </div>
 
-        </Section>
+            <div>
+              <label style={styles.label}>
+                Table Seats
+              </label>
 
+              <input
+                type="number"
+                value={tableSeats}
+                onChange={(e) =>
+                  setTableSeats(e.target.value)
+                }
+                style={styles.input}
+              />
+            </div>
+          </div>
+
+          <div style={styles.checkboxRow}>
+            <label style={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={card}
+                onChange={(e) =>
+                  setCard(e.target.checked)
+                }
+              />
+              Credit Cards Accepted
+            </label>
+
+            <label style={styles.checkboxLabel}>
+              <input
+                type="checkbox"
+                checked={taxFree}
+                onChange={(e) =>
+                  setTaxFree(e.target.checked)
+                }
+              />
+              Tax Free Available
+            </label>
+          </div>
+        </section>
 
         {/* IMAGE */}
 
-        <Section title="Image">
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>
+            Image
+          </h2>
 
-          <Field label="Image URL">
-            <input
-              type="url"
-              value={imageUrl}
-              onChange={(e) =>
-                setImageUrl(e.target.value)
-              }
-            />
-          </Field>
+          <label style={styles.label}>
+            Image URL
+          </label>
 
-        </Section>
-
+          <input
+            value={imageUrl}
+            onChange={(e) =>
+              setImageUrl(e.target.value)
+            }
+            placeholder="https://..."
+            style={styles.input}
+          />
+        </section>
 
         {/* STATUS */}
 
-        <Section title="Status">
+        <section style={styles.section}>
+          <h2 style={styles.sectionTitle}>
+            Publishing
+          </h2>
+
+          <label style={styles.label}>
+            Status
+          </label>
 
           <select
             value={status}
             onChange={(e) =>
               setStatus(e.target.value)
             }
+            style={styles.input}
           >
             <option value="draft">
               Draft
@@ -765,97 +884,174 @@ export default function NewPlacePage() {
               Archived
             </option>
           </select>
+        </section>
 
-        </Section>
+        <div style={styles.bottomActions}>
+          <Link
+            href="/admin/places"
+            style={styles.cancelButton}
+          >
+            Cancel
+          </Link>
 
-
-        {/* SAVE */}
-
-        <button
-          type="submit"
-          disabled={saving}
-          style={{
-            width: "100%",
-            padding: "16px",
-            background: "#111",
-            color: "#fff",
-            border: "none",
-            borderRadius: "8px",
-            fontSize: "16px",
-            cursor: "pointer",
-            marginTop: "20px",
-          }}
-        >
-          {saving ? "Saving..." : "Save Place"}
-        </button>
-
-      </form>
+          <button
+            type="button"
+            onClick={handleSave}
+            disabled={saving}
+            style={{
+              ...styles.saveButton,
+              opacity: saving ? 0.6 : 1,
+            }}
+          >
+            {saving ? "Saving..." : "Save Place"}
+          </button>
+        </div>
+      </div>
     </main>
   );
 }
 
+const styles = {
+  page: {
+    minHeight: "100vh",
+    background: "#fafafa",
+    padding: "40px 24px 100px",
+  },
 
-function Section({
-  title,
-  children,
-}: {
-  title: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <section
-      style={{
-        marginBottom: "32px",
-        padding: "24px",
-        border: "1px solid #e5e5e5",
-        borderRadius: "12px",
-      }}
-    >
-      <h2
-        style={{
-          marginTop: 0,
-          fontSize: "20px",
-        }}
-      >
-        {title}
-      </h2>
+  container: {
+    maxWidth: "1000px",
+    margin: "0 auto",
+  },
 
-      {children}
-    </section>
-  );
-}
+  top: {
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "flex-start",
+    gap: "20px",
+    marginBottom: "30px",
+  },
 
+  backLink: {
+    color: "#666",
+    textDecoration: "none",
+    fontSize: "14px",
+  },
 
-function Field({
-  label,
-  children,
-}: {
-  label: string;
-  children: React.ReactNode;
-}) {
-  return (
-    <div
-      style={{
-        marginBottom: "18px",
-      }}
-    >
-      <label
-        style={{
-          display: "block",
-          marginBottom: "7px",
-          fontWeight: 600,
-        }}
-      >
-        {label}
-      </label>
+  title: {
+    margin: "15px 0 8px",
+    fontSize: "34px",
+  },
 
-      <div
-        style={{
-          width: "100%",
-        }}
-      >
-        {children}
-      </div>
-    </div>
-  );
-}
+  subtitle: {
+    margin: 0,
+    color: "#666",
+  },
+
+  section: {
+    background: "#fff",
+    border: "1px solid #ddd",
+    borderRadius: "14px",
+    padding: "28px",
+    marginBottom: "20px",
+  },
+
+  sectionTitle: {
+    margin: "0 0 24px",
+    fontSize: "22px",
+  },
+
+  grid: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(auto-fit, minmax(220px, 1fr))",
+    gap: "20px",
+    marginBottom: "20px",
+  },
+
+  fullWidth: {
+    gridColumn: "1 / -1",
+    marginBottom: "20px",
+  },
+
+  label: {
+    display: "block",
+    marginBottom: "8px",
+    fontWeight: 600,
+    fontSize: "14px",
+  },
+
+  input: {
+    width: "100%",
+    height: "46px",
+    padding: "0 13px",
+    border: "1px solid #bbb",
+    borderRadius: "8px",
+    background: "#fff",
+    color: "#222",
+    fontSize: "15px",
+    boxSizing: "border-box" as const,
+  },
+
+  textarea: {
+    width: "100%",
+    minHeight: "120px",
+    padding: "13px",
+    border: "1px solid #bbb",
+    borderRadius: "8px",
+    background: "#fff",
+    color: "#222",
+    fontSize: "15px",
+    boxSizing: "border-box" as const,
+    resize: "vertical" as const,
+  },
+
+  checkboxRow: {
+    display: "flex",
+    gap: "30px",
+    flexWrap: "wrap" as const,
+    marginTop: "20px",
+  },
+
+  checkboxLabel: {
+    display: "flex",
+    alignItems: "center",
+    gap: "8px",
+    fontSize: "14px",
+  },
+
+  bottomActions: {
+    display: "flex",
+    justifyContent: "flex-end",
+    gap: "12px",
+    marginTop: "30px",
+  },
+
+  saveButton: {
+    border: "none",
+    background: "#222",
+    color: "#fff",
+    padding: "13px 22px",
+    borderRadius: "8px",
+    fontSize: "15px",
+    cursor: "pointer",
+  },
+
+  cancelButton: {
+    border: "1px solid #ccc",
+    background: "#fff",
+    color: "#333",
+    padding: "13px 22px",
+    borderRadius: "8px",
+    fontSize: "15px",
+    textDecoration: "none",
+  },
+
+  error: {
+    background: "#fff0f0",
+    border: "1px solid #e4aaaa",
+    color: "#a33",
+    padding: "15px",
+    borderRadius: "10px",
+    marginBottom: "20px",
+  },
+};
