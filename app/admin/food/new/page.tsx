@@ -5,7 +5,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
-type FoodCategory = {
+type Category = {
   id: number;
   name: string;
 };
@@ -18,24 +18,20 @@ type Place = {
 export default function NewFoodPage() {
   const router = useRouter();
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-
   const [siteId, setSiteId] = useState("");
-
-  const [categories, setCategories] = useState<FoodCategory[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
   const [places, setPlaces] = useState<Place[]>([]);
 
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState("");
   const [placeId, setPlaceId] = useState("");
-
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
-
   const [editorPick, setEditorPick] = useState(0);
   const [status, setStatus] = useState("active");
 
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
@@ -43,25 +39,20 @@ export default function NewFoodPage() {
   }, []);
 
   async function loadData() {
-    setLoading(true);
-
     try {
-      const { data: site, error: siteError } = await supabase
+      const { data: site, error } = await supabase
         .from("sites")
         .select("id")
         .eq("slug", "tokyo-guide")
         .single();
 
-      if (siteError || !site) {
-        throw new Error(
-          siteError?.message ||
-            "TOKYO GUIDE site could not be found."
-        );
+      if (error || !site) {
+        throw error || new Error("Site not found.");
       }
 
       setSiteId(site.id);
 
-      const [categoriesResult, placesResult] =
+      const [categoryResult, placeResult] =
         await Promise.all([
           supabase
             .from("food_categories")
@@ -77,16 +68,11 @@ export default function NewFoodPage() {
             .order("name"),
         ]);
 
-      if (categoriesResult.error) {
-        throw new Error(categoriesResult.error.message);
-      }
+      if (categoryResult.error) throw categoryResult.error;
+      if (placeResult.error) throw placeResult.error;
 
-      if (placesResult.error) {
-        throw new Error(placesResult.error.message);
-      }
-
-      setCategories(categoriesResult.data ?? []);
-      setPlaces(placesResult.data ?? []);
+      setCategories(categoryResult.data ?? []);
+      setPlaces(placeResult.data ?? []);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -98,16 +84,11 @@ export default function NewFoodPage() {
     }
   }
 
-  async function handleSave() {
+  async function saveFood() {
     setErrorMessage("");
 
     if (!name.trim()) {
       setErrorMessage("Please enter a food name.");
-      return;
-    }
-
-    if (!siteId) {
-      setErrorMessage("Site information could not be loaded.");
       return;
     }
 
@@ -119,29 +100,20 @@ export default function NewFoodPage() {
         .insert({
           site_id: siteId,
           name: name.trim(),
-
           category_id: categoryId
             ? Number(categoryId)
             : null,
-
           place_id: placeId || null,
-
           description: description.trim() || null,
-
           image_url: imageUrl.trim() || null,
-
           editor_pick: editorPick,
-
           status,
         })
         .select("id")
         .single();
 
       if (error || !data) {
-        throw new Error(
-          error?.message ||
-            "Failed to create food."
-        );
+        throw error || new Error("Failed to save food.");
       }
 
       router.push(`/admin/food/${data.id}`);
@@ -158,285 +130,148 @@ export default function NewFoodPage() {
   }
 
   if (loading) {
-    return (
-      <main style={styles.page}>
-        <div style={styles.loading}>
-          Loading...
-        </div>
-      </main>
-    );
+    return <main style={styles.page}>Loading...</main>;
   }
 
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-        <div style={styles.topBar}>
-          <div>
-            <Link
-              href="/admin/food"
-              style={styles.backLink}
-            >
-              ← Food Database
-            </Link>
 
-            <p style={styles.eyebrow}>
-              TOKYO GUIDE ADMIN
-            </p>
+        <Link href="/admin/food" style={styles.back}>
+          ← Food Database
+        </Link>
 
-            <h1 style={styles.title}>
-              Add New Food ✦
-            </h1>
-
-            <p style={styles.subtitle}>
-              Register a dish, sweet or drink and connect it to a place.
-            </p>
-          </div>
-
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            style={styles.saveButton}
-          >
-            {saving
-              ? "Saving..."
-              : "Save Food ✦"}
-          </button>
-        </div>
+        <h1 style={styles.title}>Add New Food ✦</h1>
 
         {errorMessage && (
-          <div style={styles.errorMessage}>
+          <div style={styles.error}>
             {errorMessage}
           </div>
         )}
 
         <div style={styles.card}>
-          <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>
-              Basic Information
-            </h2>
 
-            <div style={styles.grid}>
-              <div style={styles.fullField}>
-                <label style={styles.label}>
-                  Food Name *
-                </label>
+          <label style={styles.label}>Food Name *</label>
 
-                <input
-                  value={name}
-                  onChange={(e) =>
-                    setName(e.target.value)
-                  }
-                  placeholder="e.g. Strawberry Kakigori"
-                  style={styles.input}
-                />
-              </div>
+          <input
+            value={name}
+            onChange={(e) => setName(e.target.value)}
+            style={styles.input}
+          />
 
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Category
-                </label>
+          <label style={styles.label}>Category</label>
 
-                <select
-                  value={categoryId}
-                  onChange={(e) =>
-                    setCategoryId(e.target.value)
-                  }
-                  style={styles.select}
-                >
-                  <option value="">
-                    Select category
-                  </option>
+          <select
+            value={categoryId}
+            onChange={(e) =>
+              setCategoryId(e.target.value)
+            }
+            style={styles.input}
+          >
+            <option value="">Select category</option>
 
-                  {categories.map((category) => (
-                    <option
-                      key={category.id}
-                      value={category.id}
-                    >
-                      {category.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
+            {categories.map((category) => (
+              <option
+                key={category.id}
+                value={category.id}
+              >
+                {category.name}
+              </option>
+            ))}
+          </select>
 
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Place
-                </label>
+          <label style={styles.label}>Place</label>
 
-                <select
-                  value={placeId}
-                  onChange={(e) =>
-                    setPlaceId(e.target.value)
-                  }
-                  style={styles.select}
-                >
-                  <option value="">
-                    Select place
-                  </option>
+          <select
+            value={placeId}
+            onChange={(e) =>
+              setPlaceId(e.target.value)
+            }
+            style={styles.input}
+          >
+            <option value="">No place selected</option>
 
-                  {places.map((place) => (
-                    <option
-                      key={place.id}
-                      value={place.id}
-                    >
-                      {place.name}
-                    </option>
-                  ))}
-                </select>
+            {places.map((place) => (
+              <option
+                key={place.id}
+                value={place.id}
+              >
+                {place.name}
+              </option>
+            ))}
+          </select>
 
-                <p style={styles.help}>
-                  This links the food to the registered place.
-                </p>
-              </div>
-            </div>
-          </div>
+          <label style={styles.label}>Description</label>
 
-          <div style={styles.divider} />
+          <textarea
+            value={description}
+            onChange={(e) =>
+              setDescription(e.target.value)
+            }
+            style={styles.textarea}
+          />
 
-          <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>
-              Description
-            </h2>
+          <label style={styles.label}>Photo URL</label>
 
-            <label style={styles.label}>
-              Description
-            </label>
+          <input
+            value={imageUrl}
+            onChange={(e) =>
+              setImageUrl(e.target.value)
+            }
+            placeholder="https://..."
+            style={styles.input}
+          />
 
-            <textarea
-              value={description}
-              onChange={(e) =>
-                setDescription(e.target.value)
-              }
-              placeholder="Tell visitors what makes this food special..."
-              style={styles.textarea}
+          {imageUrl && (
+            <img
+              src={imageUrl}
+              alt="Preview"
+              style={styles.preview}
             />
-          </div>
+          )}
 
-          <div style={styles.divider} />
+          <label style={styles.label}>Editor Pick</label>
 
-          <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>
-              Image
-            </h2>
+          <select
+            value={editorPick}
+            onChange={(e) =>
+              setEditorPick(Number(e.target.value))
+            }
+            style={styles.input}
+          >
+            {[0, 1, 2, 3, 4, 5].map((n) => (
+              <option key={n} value={n}>
+                {n === 0 ? "Not selected" : "★".repeat(n)}
+              </option>
+            ))}
+          </select>
 
-            <label style={styles.label}>
-              Image URL
-            </label>
+          <label style={styles.label}>Status</label>
 
-            <input
-              value={imageUrl}
-              onChange={(e) =>
-                setImageUrl(e.target.value)
-              }
-              placeholder="https://..."
-              style={styles.input}
-            />
-
-            {imageUrl && (
-              <div style={styles.imagePreview}>
-                <img
-                  src={imageUrl}
-                  alt={name || "Food preview"}
-                  style={styles.image}
-                />
-              </div>
-            )}
-          </div>
-
-          <div style={styles.divider} />
-
-          <div style={styles.section}>
-            <h2 style={styles.sectionTitle}>
-              Publishing
-            </h2>
-
-            <div style={styles.grid}>
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Editor Pick
-                </label>
-
-                <select
-                  value={editorPick}
-                  onChange={(e) =>
-                    setEditorPick(
-                      Number(e.target.value)
-                    )
-                  }
-                  style={styles.select}
-                >
-                  <option value={0}>
-                    Not selected
-                  </option>
-
-                  <option value={1}>
-                    ★
-                  </option>
-
-                  <option value={2}>
-                    ★★
-                  </option>
-
-                  <option value={3}>
-                    ★★★
-                  </option>
-
-                  <option value={4}>
-                    ★★★★
-                  </option>
-
-                  <option value={5}>
-                    ★★★★★
-                  </option>
-                </select>
-              </div>
-
-              <div style={styles.field}>
-                <label style={styles.label}>
-                  Status
-                </label>
-
-                <select
-                  value={status}
-                  onChange={(e) =>
-                    setStatus(e.target.value)
-                  }
-                  style={styles.select}
-                >
-                  <option value="active">
-                    Active
-                  </option>
-
-                  <option value="hidden">
-                    Hidden
-                  </option>
-
-                  <option value="archived">
-                    Archived
-                  </option>
-                </select>
-              </div>
-            </div>
-          </div>
+          <select
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            style={styles.input}
+          >
+            <option value="active">Active</option>
+            <option value="hidden">Hidden</option>
+            <option value="archived">Archived</option>
+          </select>
 
           <div style={styles.bottom}>
-            <Link
-              href="/admin/food"
-              style={styles.cancelButton}
-            >
+            <Link href="/admin/food" style={styles.cancel}>
               Cancel
             </Link>
 
             <button
-              onClick={handleSave}
+              onClick={saveFood}
               disabled={saving}
-              style={styles.saveButton}
+              style={styles.save}
             >
-              {saving
-                ? "Saving..."
-                : "Save Food ✦"}
+              {saving ? "Saving..." : "Save Food ✦"}
             </button>
           </div>
+
         </div>
       </div>
     </main>
@@ -446,206 +281,88 @@ export default function NewFoodPage() {
 const styles: Record<string, React.CSSProperties> = {
   page: {
     minHeight: "100vh",
-    padding: "40px 24px 100px",
-    background:
-      "linear-gradient(135deg, #fff8fb 0%, #f8f5ff 50%, #fffaf5 100%)",
-    color: "#463c46",
+    padding: 40,
+    background: "#fff8fb",
   },
 
   container: {
-    maxWidth: "1000px",
+    maxWidth: 800,
     margin: "0 auto",
   },
 
-  loading: {
-    padding: "120px 20px",
-    textAlign: "center",
-    color: "#967c8d",
-  },
-
-  topBar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    gap: "24px",
-    marginBottom: "28px",
-  },
-
-  backLink: {
-    display: "inline-block",
-    marginBottom: "22px",
+  back: {
+    color: "#9a6078",
     textDecoration: "none",
-    color: "#a06c86",
-    fontSize: "14px",
-    fontWeight: 700,
-  },
-
-  eyebrow: {
-    margin: "0 0 8px",
-    color: "#b2819c",
-    fontSize: "11px",
-    fontWeight: 800,
-    letterSpacing: "0.14em",
   },
 
   title: {
-    margin: 0,
-    fontSize: "38px",
-    letterSpacing: "-1.5px",
-  },
-
-  subtitle: {
-    margin: "10px 0 0",
-    color: "#9a8491",
-    fontSize: "14px",
+    margin: "25px 0",
+    color: "#463c46",
   },
 
   card: {
-    background: "rgba(255,255,255,0.9)",
-    border: "1px solid #eedfe7",
-    borderRadius: "24px",
-    padding: "32px",
-    boxShadow:
-      "0 12px 40px rgba(169,119,145,0.08)",
-  },
-
-  section: {
-    padding: "4px 0",
-  },
-
-  sectionTitle: {
-    margin: "0 0 24px",
-    fontSize: "20px",
-  },
-
-  grid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(auto-fit, minmax(260px, 1fr))",
-    gap: "20px",
-  },
-
-  field: {
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
-  },
-
-  fullField: {
-    gridColumn: "1 / -1",
-    display: "flex",
-    flexDirection: "column",
-    gap: "8px",
+    background: "#fff",
+    padding: 30,
+    borderRadius: 20,
+    border: "1px solid #eadde4",
   },
 
   label: {
-    fontSize: "13px",
-    fontWeight: 800,
-    color: "#705c68",
+    display: "block",
+    marginTop: 20,
+    marginBottom: 8,
+    fontWeight: 700,
+    color: "#705b67",
   },
 
   input: {
     width: "100%",
-    height: "48px",
-    padding: "0 14px",
-    borderRadius: "12px",
-    border: "1px solid #eadce5",
-    background: "#fff",
-    outline: "none",
+    padding: 13,
+    borderRadius: 10,
+    border: "1px solid #dfd3da",
     boxSizing: "border-box",
-    fontSize: "14px",
-  },
-
-  select: {
-    width: "100%",
-    height: "48px",
-    padding: "0 14px",
-    borderRadius: "12px",
-    border: "1px solid #eadce5",
-    background: "#fff",
-    outline: "none",
-    fontSize: "14px",
   },
 
   textarea: {
     width: "100%",
-    minHeight: "140px",
-    padding: "14px",
-    borderRadius: "12px",
-    border: "1px solid #eadce5",
-    background: "#fff",
-    outline: "none",
+    minHeight: 120,
+    padding: 13,
+    borderRadius: 10,
+    border: "1px solid #dfd3da",
     boxSizing: "border-box",
-    resize: "vertical",
-    fontSize: "14px",
-    fontFamily: "inherit",
   },
 
-  help: {
-    margin: 0,
-    color: "#aa929f",
-    fontSize: "11px",
-    lineHeight: 1.5,
-  },
-
-  divider: {
-    height: "1px",
-    background: "#f1e6eb",
-    margin: "32px 0",
-  },
-
-  imagePreview: {
-    marginTop: "18px",
-    borderRadius: "16px",
-    overflow: "hidden",
-    maxWidth: "420px",
-    border: "1px solid #eedfe7",
-  },
-
-  image: {
+  preview: {
     width: "100%",
-    display: "block",
-    maxHeight: "320px",
-    objectFit: "cover",
+    maxWidth: 350,
+    marginTop: 15,
+    borderRadius: 12,
   },
 
   bottom: {
-    marginTop: "38px",
-    paddingTop: "24px",
-    borderTop: "1px solid #f1e6eb",
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
+    marginTop: 30,
   },
 
-  cancelButton: {
-    textDecoration: "none",
-    color: "#927987",
-    fontSize: "14px",
-    fontWeight: 700,
-    padding: "14px 18px",
+  cancel: {
+    padding: "13px 20px",
+    color: "#806878",
   },
 
-  saveButton: {
-    border: "none",
-    padding: "14px 22px",
-    borderRadius: "14px",
-    background:
-      "linear-gradient(135deg, #e99bb9, #c69ae1)",
+  save: {
+    padding: "13px 22px",
+    border: 0,
+    borderRadius: 12,
+    background: "#d98eae",
     color: "#fff",
-    fontWeight: 800,
-    cursor: "pointer",
-    fontSize: "14px",
-    boxShadow:
-      "0 8px 20px rgba(202,143,177,0.25)",
+    fontWeight: 700,
   },
 
-  errorMessage: {
-    marginBottom: "20px",
-    padding: "15px 18px",
-    borderRadius: "14px",
+  error: {
     background: "#fff0f2",
-    border: "1px solid #f2c3cc",
-    color: "#ad5367",
+    color: "#b45165",
+    padding: 15,
+    borderRadius: 12,
   },
 };
