@@ -9,23 +9,21 @@ type CountData = {
   places: number;
   foods: number;
   products: number;
-  articles: number;
-  placeCategories: number;
+  placeTypes: number;
   foodCategories: number;
   productCategories: number;
   regions: number;
-  shops: number;
 };
 
 type RecentPlace = {
   id: string;
   name: string;
   status: string;
-  updated_at: string;
-  site_name: string;
-  region_name: string | null;
-  area_name: string | null;
-  brand_name: string | null;
+  updated_at: string | null;
+  address: string | null;
+  place_types: { name: string }[] | null;
+  regions: { name: string }[] | null;
+  areas: { name: string }[] | null;
 };
 
 type RecentFood = {
@@ -33,7 +31,9 @@ type RecentFood = {
   name: string;
   status: string;
   editor_pick: number;
-  category_id: number | null;
+  updated_at: string | null;
+  foods_categories?: never;
+  food_categories: { name: string }[] | null;
 };
 
 type RecentProduct = {
@@ -41,19 +41,8 @@ type RecentProduct = {
   name: string;
   brand: string | null;
   status: string;
-  updated_at: string;
-  site_name: string;
-  category_name: string | null;
-  variant_count: number;
-};
-
-type RecentArticle = {
-  id: string;
-  title: string;
-  status: string;
-  updated_at: string;
-  site_name: string;
-  block_count: number;
+  updated_at: string | null;
+  product_categories: { name: string }[] | null;
 };
 
 export default function AdminDashboard() {
@@ -63,35 +52,24 @@ export default function AdminDashboard() {
     places: 0,
     foods: 0,
     products: 0,
-    articles: 0,
-    placeCategories: 0,
+    placeTypes: 0,
     foodCategories: 0,
     productCategories: 0,
     regions: 0,
-    shops: 0,
   });
 
   const [recentPlaces, setRecentPlaces] = useState<RecentPlace[]>([]);
   const [recentFoods, setRecentFoods] = useState<RecentFood[]>([]);
   const [recentProducts, setRecentProducts] = useState<RecentProduct[]>([]);
-  const [recentArticles, setRecentArticles] = useState<RecentArticle[]>([]);
 
   const [loading, setLoading] = useState(true);
   const [errorMessage, setErrorMessage] = useState("");
-
-  // =========================
-  // LOGOUT
-  // =========================
 
   const handleLogout = async () => {
     await supabase.auth.signOut();
     router.replace("/login");
     router.refresh();
   };
-
-  // =========================
-  // LOAD DASHBOARD
-  // =========================
 
   useEffect(() => {
     async function loadDashboard() {
@@ -102,18 +80,15 @@ export default function AdminDashboard() {
         placesCount,
         foodsCount,
         productsCount,
-        articlesCount,
-        placeCategoriesCount,
+        placeTypesCount,
         foodCategoriesCount,
         productCategoriesCount,
         regionsCount,
-        shopsCount,
         recentPlacesResult,
         recentFoodsResult,
         recentProductsResult,
-        recentArticlesResult,
       ] = await Promise.all([
-        supabase.from("admin_places").select("*", {
+        supabase.from("places").select("*", {
           count: "exact",
           head: true,
         }),
@@ -123,17 +98,12 @@ export default function AdminDashboard() {
           head: true,
         }),
 
-        supabase.from("admin_products").select("*", {
+        supabase.from("products").select("*", {
           count: "exact",
           head: true,
         }),
 
-        supabase.from("admin_articles").select("*", {
-          count: "exact",
-          head: true,
-        }),
-
-        supabase.from("place_categories").select("*", {
+        supabase.from("place_types").select("*", {
           count: "exact",
           head: true,
         }),
@@ -153,14 +123,24 @@ export default function AdminDashboard() {
           head: true,
         }),
 
-        supabase.from("place_groups").select("*", {
-          count: "exact",
-          head: true,
-        }),
-
         supabase
-          .from("admin_places")
-          .select("*")
+          .from("places")
+          .select(`
+            id,
+            name,
+            status,
+            updated_at,
+            address,
+            place_types (
+              name
+            ),
+            regions (
+              name
+            ),
+            areas (
+              name
+            )
+          `)
           .order("updated_at", {
             ascending: false,
           })
@@ -173,22 +153,28 @@ export default function AdminDashboard() {
             name,
             status,
             editor_pick,
-            category_id
+            updated_at,
+            food_categories (
+              name
+            )
           `)
-          .order("name")
-          .limit(5),
-
-        supabase
-          .from("admin_products")
-          .select("*")
           .order("updated_at", {
             ascending: false,
           })
           .limit(5),
 
         supabase
-          .from("admin_articles")
-          .select("*")
+          .from("products")
+          .select(`
+            id,
+            name,
+            brand,
+            status,
+            updated_at,
+            product_categories (
+              name
+            )
+          `)
           .order("updated_at", {
             ascending: false,
           })
@@ -199,16 +185,13 @@ export default function AdminDashboard() {
         placesCount.error ||
         foodsCount.error ||
         productsCount.error ||
-        articlesCount.error ||
-        placeCategoriesCount.error ||
+        placeTypesCount.error ||
         foodCategoriesCount.error ||
         productCategoriesCount.error ||
         regionsCount.error ||
-        shopsCount.error ||
         recentPlacesResult.error ||
         recentFoodsResult.error ||
-        recentProductsResult.error ||
-        recentArticlesResult.error;
+        recentProductsResult.error;
 
       if (firstError) {
         setErrorMessage(firstError.message);
@@ -220,28 +203,22 @@ export default function AdminDashboard() {
         places: placesCount.count ?? 0,
         foods: foodsCount.count ?? 0,
         products: productsCount.count ?? 0,
-        articles: articlesCount.count ?? 0,
-        placeCategories: placeCategoriesCount.count ?? 0,
+        placeTypes: placeTypesCount.count ?? 0,
         foodCategories: foodCategoriesCount.count ?? 0,
         productCategories: productCategoriesCount.count ?? 0,
         regions: regionsCount.count ?? 0,
-        shops: shopsCount.count ?? 0,
       });
 
       setRecentPlaces(
-        (recentPlacesResult.data ?? []) as RecentPlace[]
+        (recentPlacesResult.data ?? []) as unknown as RecentPlace[]
       );
 
       setRecentFoods(
-        (recentFoodsResult.data ?? []) as RecentFood[]
+        (recentFoodsResult.data ?? []) as unknown as RecentFood[]
       );
 
       setRecentProducts(
-        (recentProductsResult.data ?? []) as RecentProduct[]
-      );
-
-      setRecentArticles(
-        (recentArticlesResult.data ?? []) as RecentArticle[]
+        (recentProductsResult.data ?? []) as unknown as RecentProduct[]
       );
 
       setLoading(false);
@@ -259,7 +236,7 @@ export default function AdminDashboard() {
     {
       label: "Foods",
       value: counts.foods,
-      href: "/admin/food",
+      href: "/admin/foods",
     },
     {
       label: "Products",
@@ -267,14 +244,14 @@ export default function AdminDashboard() {
       href: "/admin/products",
     },
     {
-      label: "Articles",
-      value: counts.articles,
-      href: "/admin/articles",
+      label: "Place Types",
+      value: counts.placeTypes,
+      href: "/admin/place-types",
     },
     {
-      label: "Shops",
-      value: counts.shops,
-      href: "/admin/place-groups",
+      label: "Food Categories",
+      value: counts.foodCategories,
+      href: "/admin/food-categories",
     },
     {
       label: "Regions",
@@ -309,7 +286,7 @@ export default function AdminDashboard() {
           </h1>
 
           <p style={styles.description}>
-            Your content, all in one place.
+            Manage TOKYO GUIDE content.
           </p>
         </header>
 
@@ -354,20 +331,24 @@ export default function AdminDashboard() {
               style={styles.actionCard}
             >
               <span style={styles.actionPlus}>+</span>
+
               <strong>Place</strong>
+
               <span>
-                Add a location, shop, restaurant or café.
+                Add a restaurant, shop, sightseeing spot or other place.
               </span>
             </Link>
 
             <Link
-              href="/admin/food/new"
+              href="/admin/foods/new"
               style={styles.actionCard}
             >
               <span style={styles.actionPlus}>+</span>
+
               <strong>Food</strong>
+
               <span>
-                Add a Japanese food and its places.
+                Add an individual food item and connect it to a place.
               </span>
             </Link>
 
@@ -376,20 +357,11 @@ export default function AdminDashboard() {
               style={styles.actionCard}
             >
               <span style={styles.actionPlus}>+</span>
-              <strong>Product</strong>
-              <span>
-                Add a product and its variants.
-              </span>
-            </Link>
 
-            <Link
-              href="/admin/articles/new"
-              style={styles.actionCard}
-            >
-              <span style={styles.actionPlus}>+</span>
-              <strong>Article</strong>
+              <strong>Product</strong>
+
               <span>
-                Create a guide or editorial story.
+                Add a product and connect it to places where it is available.
               </span>
             </Link>
           </div>
@@ -397,9 +369,14 @@ export default function AdminDashboard() {
 
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Places</h2>
+            <h2 style={styles.sectionTitle}>
+              Recent Places
+            </h2>
 
-            <Link href="/admin/places" style={styles.viewAll}>
+            <Link
+              href="/admin/places"
+              style={styles.viewAll}
+            >
               View all →
             </Link>
           </div>
@@ -407,13 +384,15 @@ export default function AdminDashboard() {
           <div style={styles.table}>
             <div style={styles.tableHeaderFour}>
               <span>Name</span>
-              <span>Shop / Chain</span>
-              <span>Region</span>
+              <span>Type</span>
+              <span>Area</span>
               <span>Status</span>
             </div>
 
             {recentPlaces.length === 0 ? (
-              <div style={styles.empty}>No places yet.</div>
+              <div style={styles.empty}>
+                No places yet.
+              </div>
             ) : (
               recentPlaces.map((place) => (
                 <Link
@@ -423,9 +402,15 @@ export default function AdminDashboard() {
                 >
                   <strong>{place.name}</strong>
 
-                  <span>{place.brand_name ?? "—"}</span>
+                  <span>
+                    {place.place_types?.[0]?.name ?? "—"}
+                  </span>
 
-                  <span>{place.region_name ?? "—"}</span>
+                  <span>
+                    {place.areas?.[0]?.name ??
+                      place.regions?.[0]?.name ??
+                      "—"}
+                  </span>
 
                   <StatusBadge status={place.status} />
                 </Link>
@@ -436,9 +421,14 @@ export default function AdminDashboard() {
 
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Foods</h2>
+            <h2 style={styles.sectionTitle}>
+              Recent Foods
+            </h2>
 
-            <Link href="/admin/food" style={styles.viewAll}>
+            <Link
+              href="/admin/foods"
+              style={styles.viewAll}
+            >
               View all →
             </Link>
           </div>
@@ -451,11 +441,13 @@ export default function AdminDashboard() {
             </div>
 
             {recentFoods.length === 0 ? (
-              <div style={styles.empty}>No foods yet.</div>
+              <div style={styles.empty}>
+                No foods yet.
+              </div>
             ) : (
               recentFoods.map((food) => (
                 <Link
-                  href={`/admin/food/${food.id}`}
+                  href={`/admin/foods/${food.id}`}
                   key={food.id}
                   style={styles.tableRowThree}
                 >
@@ -476,9 +468,14 @@ export default function AdminDashboard() {
 
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Products</h2>
+            <h2 style={styles.sectionTitle}>
+              Recent Products
+            </h2>
 
-            <Link href="/admin/products" style={styles.viewAll}>
+            <Link
+              href="/admin/products"
+              style={styles.viewAll}
+            >
               View all →
             </Link>
           </div>
@@ -487,12 +484,14 @@ export default function AdminDashboard() {
             <div style={styles.tableHeaderFour}>
               <span>Product</span>
               <span>Brand</span>
-              <span>Variants</span>
+              <span>Category</span>
               <span>Status</span>
             </div>
 
             {recentProducts.length === 0 ? (
-              <div style={styles.empty}>No products yet.</div>
+              <div style={styles.empty}>
+                No products yet.
+              </div>
             ) : (
               recentProducts.map((product) => (
                 <Link
@@ -502,9 +501,13 @@ export default function AdminDashboard() {
                 >
                   <strong>{product.name}</strong>
 
-                  <span>{product.brand ?? "—"}</span>
+                  <span>
+                    {product.brand ?? "—"}
+                  </span>
 
-                  <span>{product.variant_count}</span>
+                  <span>
+                    {product.product_categories?.[0]?.name ?? "—"}
+                  </span>
 
                   <StatusBadge status={product.status} />
                 </Link>
@@ -515,54 +518,25 @@ export default function AdminDashboard() {
 
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Articles</h2>
-
-            <Link href="/admin/articles" style={styles.viewAll}>
-              View all →
-            </Link>
-          </div>
-
-          <div style={styles.table}>
-            <div style={styles.tableHeaderFour}>
-              <span>Title</span>
-              <span>Blocks</span>
-              <span>Updated</span>
-              <span>Status</span>
-            </div>
-
-            {recentArticles.length === 0 ? (
-              <div style={styles.empty}>No articles yet.</div>
-            ) : (
-              recentArticles.map((article) => (
-                <Link
-                  href={`/admin/articles/${article.id}`}
-                  key={article.id}
-                  style={styles.tableRowFour}
-                >
-                  <strong>{article.title}</strong>
-
-                  <span>{article.block_count}</span>
-
-                  <span>{formatDate(article.updated_at)}</span>
-
-                  <StatusBadge status={article.status} />
-                </Link>
-              ))
-            )}
-          </div>
-        </section>
-
-        <section style={styles.section}>
-          <div style={styles.sectionHeader}>
-            <h2 style={styles.sectionTitle}>Structure</h2>
+            <h2 style={styles.sectionTitle}>
+              Structure
+            </h2>
           </div>
 
           <div style={styles.structureGrid}>
             <Link
-              href="/admin/categories"
+              href="/admin/places"
               style={styles.manageLink}
             >
-              <span>Place Categories</span>
+              <span>Places</span>
+              <span>→</span>
+            </Link>
+
+            <Link
+              href="/admin/place-types"
+              style={styles.manageLink}
+            >
+              <span>Place Types</span>
               <span>→</span>
             </Link>
 
@@ -591,18 +565,18 @@ export default function AdminDashboard() {
             </Link>
 
             <Link
-              href="/admin/place-groups"
+              href="/admin/areas"
               style={styles.manageLink}
             >
-              <span>Shops / Chains</span>
+              <span>Areas</span>
               <span>→</span>
             </Link>
 
             <Link
-              href="/admin/places"
+              href="/admin/stations"
               style={styles.manageLink}
             >
-              <span>Places</span>
+              <span>Stations</span>
               <span>→</span>
             </Link>
           </div>
@@ -630,16 +604,6 @@ function StatusBadge({
       {labelMap[status] ?? status}
     </span>
   );
-}
-
-function formatDate(value: string) {
-  if (!value) return "—";
-
-  return new Intl.DateTimeFormat("en-US", {
-    year: "numeric",
-    month: "short",
-    day: "numeric",
-  }).format(new Date(value));
 }
 
 const styles = {
@@ -715,7 +679,7 @@ const styles = {
 
   statsGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(6, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "10px",
   },
 
@@ -777,7 +741,7 @@ const styles = {
 
   actionGrid: {
     display: "grid",
-    gridTemplateColumns: "repeat(4, minmax(0, 1fr))",
+    gridTemplateColumns: "repeat(3, minmax(0, 1fr))",
     gap: "12px",
   },
 

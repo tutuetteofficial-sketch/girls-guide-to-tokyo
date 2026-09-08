@@ -1,66 +1,73 @@
 "use client";
 
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { supabase } from "@/lib/supabase";
-import ImageGalleryUploader, {
-  type GalleryImage,
-} from "@/components/ImageGalleryUploader";
+import { useEffect, useState } from "react";
+import { useRouter } from "next/navigation";
+import { createClient } from "@supabase/supabase-js";
 
-type Option = {
-  id: number | string;
-  name: string;
-};
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-type Area = {
-  id: number;
-  region_id: number;
-  name: string;
-};
-
-type Category = {
-  id: number;
-  name: string;
-  parent_id: number | null;
-};
-
-type CategoryNode = Category & {
-  children: CategoryNode[];
-};
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 type PlaceType = {
   id: number;
   name: string;
 };
 
+type Region = {
+  id: number;
+  name: string;
+};
+
+type Area = {
+  id: number;
+  name: string;
+  region_id: number;
+};
+
+type Station = {
+  id: number;
+  name: string;
+};
+
 export default function NewPlacePage() {
+  const router = useRouter();
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+
+  const [siteId, setSiteId] = useState("");
+
+  const [placeTypes, setPlaceTypes] = useState<PlaceType[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [stations, setStations] = useState<Station[]>([]);
+
   const [name, setName] = useState("");
+  const [placeTypeId, setPlaceTypeId] = useState("");
+  const [regionId, setRegionId] = useState("");
+  const [areaId, setAreaId] = useState("");
+
   const [description, setDescription] = useState("");
   const [editorNote, setEditorNote] = useState("");
 
-  const [placeTypeInput, setPlaceTypeInput] = useState("");
-  const [placeTypeId, setPlaceTypeId] = useState("");
-
-  const [groupInput, setGroupInput] = useState("");
-  const [groupId, setGroupId] = useState("");
-
-  const [regionId, setRegionId] = useState("");
-  const [areaInput, setAreaInput] = useState("");
-  const [areaId, setAreaId] = useState("");
-
-  const [address, setAddress] = useState("");
   const [postalCode, setPostalCode] = useState("");
+  const [address, setAddress] = useState("");
+
   const [phone, setPhone] = useState("");
 
   const [priceRange, setPriceRange] = useState("");
+
   const [seats, setSeats] = useState("");
   const [counterSeats, setCounterSeats] = useState("");
   const [tableSeats, setTableSeats] = useState("");
-  const [reservation, setReservation] = useState("");
 
+  const [reservation, setReservation] = useState("");
   const [englishSupport, setEnglishSupport] = useState("");
+
   const [card, setCard] = useState(false);
   const [taxFree, setTaxFree] = useState(false);
+
   const [openingHours, setOpeningHours] = useState("");
   const [closedDays, setClosedDays] = useState("");
 
@@ -69,1497 +76,408 @@ export default function NewPlacePage() {
   const [tabelogUrl, setTabelogUrl] = useState("");
   const [googleMapsUrl, setGoogleMapsUrl] = useState("");
 
+  const [imageUrl, setImageUrl] = useState("");
+
   const [status, setStatus] = useState("draft");
 
-  const [groups, setGroups] = useState<Option[]>([]);
-  const [regions, setRegions] = useState<Option[]>([]);
-  const [areas, setAreas] = useState<Area[]>([]);
-  const [categories, setCategories] = useState<Category[]>([]);
-  const [products, setProducts] = useState<Option[]>([]);
-  const [stations, setStations] = useState<Option[]>([]);
-  const [placeTypes, setPlaceTypes] = useState<PlaceType[]>([]);
-
-  const [selectedCategoryIds, setSelectedCategoryIds] =
-    useState<number[]>([]);
-
-  const [selectedProductIds, setSelectedProductIds] =
-    useState<string[]>([]);
-
-  const [selectedStationId, setSelectedStationId] =
-    useState("");
-
-  const [stationExit, setStationExit] = useState("");
-  const [walkMinutes, setWalkMinutes] = useState("");
-
-  const [placeImages, setPlaceImages] =
-    useState<GalleryImage[]>([]);
-
-  const [loadingOptions, setLoadingOptions] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
+  const [selectedStations, setSelectedStations] = useState<
+    {
+      station_id: string;
+      station_exit: string;
+      walk_minutes: string;
+    }[]
+  >([]);
 
   useEffect(() => {
-    async function loadOptions() {
-      setLoadingOptions(true);
-
-      const [
-        groupsResult,
-        regionsResult,
-        areasResult,
-        categoriesResult,
-        productsResult,
-        placeTypesResult,
-        stationsResult,
-      ] = await Promise.all([
-        supabase
-          .from("place_groups")
-          .select("id, name")
-          .eq("is_active", true)
-          .order("name"),
-
-        supabase
-          .from("regions")
-          .select("id, name")
-          .eq("is_active", true)
-          .order("sort_order")
-          .order("name"),
-
-        supabase
-          .from("areas")
-          .select("id, region_id, name")
-          .eq("is_active", true)
-          .order("sort_order")
-          .order("name"),
-
-        supabase
-          .from("place_categories")
-          .select("id, name, parent_id")
-          .eq("is_active", true)
-          .order("sort_order")
-          .order("name"),
-
-        supabase
-          .from("products")
-          .select("id, name")
-          .in("status", ["draft", "published"])
-          .order("name"),
-
-        supabase
-          .from("place_types")
-          .select("id, name")
-          .eq("is_active", true)
-          .order("sort_order")
-          .order("name"),
-
-        supabase
-          .from("stations")
-          .select("id, name")
-          .eq("is_active", true)
-          .order("name"),
-      ]);
-
-      const errors = [
-        groupsResult.error,
-        regionsResult.error,
-        areasResult.error,
-        categoriesResult.error,
-        productsResult.error,
-        placeTypesResult.error,
-        stationsResult.error,
-      ].filter(Boolean);
-
-      if (errors.length > 0) {
-        setMessage(
-          `選択肢の読み込みに失敗しました: ${errors[0]!.message}`
-        );
-      }
-
-      const loadedGroups =
-        (groupsResult.data ?? []) as Option[];
-
-      const loadedRegions =
-        (regionsResult.data ?? []) as Option[];
-
-      const loadedPlaceTypes =
-        (placeTypesResult.data ?? []) as PlaceType[];
-
-      setGroups(loadedGroups);
-      setRegions(loadedRegions);
-      setAreas((areasResult.data ?? []) as Area[]);
-      setCategories(
-        (categoriesResult.data ?? []) as Category[]
-      );
-      setProducts((productsResult.data ?? []) as Option[]);
-      setPlaceTypes(loadedPlaceTypes);
-      setStations((stationsResult.data ?? []) as Option[]);
-
-      const tokyo = loadedRegions.find(
-        (region) =>
-          region.name.trim().toLowerCase() === "tokyo"
-      );
-
-      if (tokyo) {
-        setRegionId(String(tokyo.id));
-      }
-
-      setLoadingOptions(false);
-    }
-
-    loadOptions();
+    loadMasterData();
   }, []);
 
-  const filteredAreas = useMemo(() => {
-    if (!regionId) {
-      return [];
-    }
+  async function loadMasterData() {
+    setLoading(true);
 
-    return areas.filter(
-      (area) => area.region_id === Number(regionId)
-    );
-  }, [areas, regionId]);
+    const [
+      siteResult,
+      placeTypeResult,
+      regionResult,
+      areaResult,
+      stationResult,
+    ] = await Promise.all([
+      supabase
+        .from("sites")
+        .select("id")
+        .eq("slug", "tokyo-guide")
+        .single(),
 
-  function handleRegionChange(value: string) {
-    setRegionId(value);
-    setAreaId("");
-    setAreaInput("");
-  }
+      supabase
+        .from("place_types")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("sort_order"),
 
-  function handleAreaChange(value: string) {
-    setAreaInput(value);
+      supabase
+        .from("regions")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("sort_order"),
 
-    const matchedArea = filteredAreas.find(
-      (area) =>
-        area.name.trim().toLowerCase() ===
-        value.trim().toLowerCase()
-    );
+      supabase
+        .from("areas")
+        .select("id, name, region_id")
+        .eq("is_active", true)
+        .order("sort_order"),
 
-    setAreaId(
-      matchedArea ? String(matchedArea.id) : ""
-    );
-  }
+      supabase
+        .from("stations")
+        .select("id, name")
+        .eq("is_active", true)
+        .order("name"),
+    ]);
 
-  function handleGroupChange(value: string) {
-    setGroupInput(value);
-
-    const matchedGroup = groups.find(
-      (group) =>
-        group.name.trim().toLowerCase() ===
-        value.trim().toLowerCase()
-    );
-
-    setGroupId(
-      matchedGroup ? String(matchedGroup.id) : ""
-    );
-  }
-
-  function handlePlaceTypeChange(value: string) {
-    setPlaceTypeInput(value);
-
-    const matchedType = placeTypes.find(
-      (type) =>
-        type.name.trim().toLowerCase() ===
-        value.trim().toLowerCase()
-    );
-
-    setPlaceTypeId(
-      matchedType ? String(matchedType.id) : ""
-    );
-  }
-
-  const isFoodPlace = useMemo(() => {
-    const value =
-      placeTypeInput.trim().toLowerCase();
-
-    return (
-      value === "restaurant" ||
-      value === "café" ||
-      value === "cafe"
-    );
-  }, [placeTypeInput]);
-
-  const categoryTree = useMemo(() => {
-    const nodes = new Map<number, CategoryNode>();
-
-    categories.forEach((category) => {
-      nodes.set(category.id, {
-        ...category,
-        children: [],
-      });
-    });
-
-    const roots: CategoryNode[] = [];
-
-    categories.forEach((category) => {
-      const node = nodes.get(category.id);
-
-      if (!node) {
-        return;
-      }
-
-      if (
-        category.parent_id !== null &&
-        nodes.has(category.parent_id)
-      ) {
-        nodes
-          .get(category.parent_id)!
-          .children.push(node);
-      } else {
-        roots.push(node);
-      }
-    });
-
-    return roots;
-  }, [categories]);
-
-  function toggleCategory(id: number) {
-    setSelectedCategoryIds((current) =>
-      current.includes(id)
-        ? current.filter((value) => value !== id)
-        : [...current, id]
-    );
-  }
-
-  function toggleProduct(id: string) {
-    setSelectedProductIds((current) =>
-      current.includes(id)
-        ? current.filter((value) => value !== id)
-        : [...current, id]
-    );
-  }
-
-  async function resolveGroupId(
-    siteId: string
-  ): Promise<string | null> {
-    const trimmedName = groupInput.trim();
-
-    if (!trimmedName) {
-      return null;
-    }
-
-    const existingGroup = groups.find(
-      (group) =>
-        group.name.trim().toLowerCase() ===
-        trimmedName.toLowerCase()
-    );
-
-    if (existingGroup) {
-      return String(existingGroup.id);
-    }
-
-    const {
-      data,
-      error,
-    } = await supabase
-      .from("place_groups")
-      .insert({
-        site_id: siteId,
-        name: trimmedName,
-        is_active: true,
-      })
-      .select("id")
-      .single();
-
-    if (error || !data) {
-      throw new Error(
-        `Place Groupの作成に失敗しました: ${
-          error?.message ?? "Unknown error"
-        }`
-      );
-    }
-
-    return String(data.id);
-  }
-
-  async function resolvePlaceTypeId(
-    siteId: string
-  ): Promise<number | null> {
-    const trimmedName =
-      placeTypeInput.trim();
-
-    if (!trimmedName) {
-      return null;
-    }
-
-    const existingType =
-      placeTypes.find(
-        (type) =>
-          type.name.trim().toLowerCase() ===
-          trimmedName.toLowerCase()
-      );
-
-    if (existingType) {
-      return existingType.id;
-    }
-
-    const slug =
-      trimmedName
-        .toLowerCase()
-        .replace(/\s+/g, "-")
-        .replace(/[^a-z0-9-]/g, "") ||
-      `place-type-${Date.now()}`;
-
-    const {
-      data,
-      error,
-    } = await supabase
-      .from("place_types")
-      .insert({
-        site_id: siteId,
-        name: trimmedName,
-        slug,
-        description: null,
-        is_active: true,
-        sort_order: 0,
-      })
-      .select("id")
-      .single();
-
-    if (error || !data) {
-      throw new Error(
-        `Place Typeの作成に失敗しました: ${
-          error?.message ?? "Unknown error"
-        }`
-      );
-    }
-
-    return data.id;
-  }
-
-  async function resolveAreaId(): Promise<
-    number | null
-  > {
-    const trimmedName = areaInput.trim();
-
-    if (!trimmedName || !regionId) {
-      return null;
-    }
-
-    const existingArea =
-      filteredAreas.find(
-        (area) =>
-          area.name.trim().toLowerCase() ===
-          trimmedName.toLowerCase()
-      );
-
-    if (existingArea) {
-      return existingArea.id;
-    }
-
-    const {
-      data,
-      error,
-    } = await supabase
-      .from("areas")
-      .insert({
-        region_id:
-          Number(regionId),
-        name: trimmedName,
-        sort_order: 0,
-        is_active: true,
-      })
-      .select("id")
-      .single();
-
-    if (error || !data) {
-      throw new Error(
-        `Areaの作成に失敗しました: ${
-          error?.message ?? "Unknown error"
-        }`
-      );
-    }
-
-    return data.id;
-  }
-
-  async function handleSubmit(
-    e: React.FormEvent<HTMLFormElement>
-  ) {
-    e.preventDefault();
-
-    if (!name.trim()) {
-      setMessage(
-        "Place nameを入力してください。"
-      );
+    if (siteResult.error) {
+      alert(siteResult.error.message);
+      setLoading(false);
       return;
     }
 
-    if (!regionId) {
-      setMessage(
-        "Regionを選択してください。"
-      );
+    setSiteId(siteResult.data.id);
+
+    if (!placeTypeResult.error) {
+      setPlaceTypes(placeTypeResult.data || []);
+    }
+
+    if (!regionResult.error) {
+      setRegions(regionResult.data || []);
+    }
+
+    if (!areaResult.error) {
+      setAreas(areaResult.data || []);
+    }
+
+    if (!stationResult.error) {
+      setStations(stationResult.data || []);
+    }
+
+    setLoading(false);
+  }
+
+  const filteredAreas = regionId
+    ? areas.filter((area) => area.region_id === Number(regionId))
+    : [];
+
+  function addStation() {
+    setSelectedStations([
+      ...selectedStations,
+      {
+        station_id: "",
+        station_exit: "",
+        walk_minutes: "",
+      },
+    ]);
+  }
+
+  function updateStation(
+    index: number,
+    field: "station_id" | "station_exit" | "walk_minutes",
+    value: string
+  ) {
+    const updated = [...selectedStations];
+
+    updated[index] = {
+      ...updated[index],
+      [field]: value,
+    };
+
+    setSelectedStations(updated);
+  }
+
+  function removeStation(index: number) {
+    setSelectedStations(
+      selectedStations.filter((_, i) => i !== index)
+    );
+  }
+
+  async function handleSubmit(e: React.FormEvent) {
+    e.preventDefault();
+
+    if (!name.trim()) {
+      alert("Place name is required.");
+      return;
+    }
+
+    if (!siteId) {
+      alert("Site information could not be loaded.");
       return;
     }
 
     setSaving(true);
-    setMessage("保存中...");
-
-    try {
-      const {
-        data: site,
-        error: siteError,
-      } = await supabase
-        .from("sites")
-        .select("id")
-        .eq("slug", "tokyo-guide")
-        .single();
-
-      if (siteError || !site) {
-        throw new Error(
-          `サイト情報を取得できませんでした: ${
-            siteError?.message ?? "Unknown error"
-          }`
-        );
-      }
-
-      const resolvedPlaceTypeId =
-        await resolvePlaceTypeId(site.id);
-
-      const resolvedGroupId =
-        await resolveGroupId(site.id);
-
-      const resolvedAreaId =
-        await resolveAreaId();
-
-      const mainImageUrl =
-        placeImages[0]?.image_url ?? null;
-
-      const {
-        data: place,
-        error: placeError,
-      } = await supabase
-        .from("places")
-        .insert({
-          site_id: site.id,
-
-          place_type_id:
-            resolvedPlaceTypeId,
-
-          group_id:
-            resolvedGroupId,
-
-          region_id:
-            Number(regionId),
-
-          area_id:
-            resolvedAreaId,
-
-          name:
-            name.trim(),
-
-          description:
-            description.trim() ||
-            null,
-
-          editor_note:
-            editorNote.trim() ||
-            null,
-
-          address:
-            address.trim() ||
-            null,
-
-          postal_code:
-            postalCode.trim() ||
-            null,
-
-          phone:
-            phone.trim() ||
-            null,
-
-          price_range:
-            isFoodPlace
-              ? priceRange.trim() ||
-                null
-              : null,
-
-          seats:
-            isFoodPlace &&
-            seats
-              ? Number(seats)
-              : null,
-
-          counter_seats:
-            isFoodPlace &&
-            counterSeats
-              ? Number(counterSeats)
-              : null,
-
-          table_seats:
-            isFoodPlace &&
-            tableSeats
-              ? Number(tableSeats)
-              : null,
-
-          reservation:
-            isFoodPlace
-              ? reservation ||
-                null
-              : null,
-
-          english_support:
-            englishSupport ||
-            null,
-
-          card,
-          tax_free:
-            taxFree,
-
-          opening_hours:
-            openingHours.trim() ||
-            null,
-
-          closed_days:
-            closedDays.trim() ||
-            null,
-
-          official_url:
-            officialUrl.trim() ||
-            null,
-
-          instagram_url:
-            instagramUrl.trim() ||
-            null,
-
-          tabelog_url:
-            tabelogUrl.trim() ||
-            null,
-
-          google_maps_url:
-            googleMapsUrl.trim() ||
-            null,
-
-          image_url:
-            mainImageUrl,
-
-          status,
-        })
-        .select("id")
-        .single();
-
-      if (placeError || !place) {
-        throw new Error(
-          `Placeの保存に失敗しました: ${
-            placeError?.message ?? "Unknown error"
-          }`
-        );
-      }
-
-      const placeId = place.id;
-
-      if (
-        selectedCategoryIds.length >
-        0
-      ) {
-        const rows =
-          selectedCategoryIds.map(
-            (categoryId) => ({
-              place_id:
-                placeId,
-              category_id:
-                categoryId,
-            })
-          );
-
-        const {
-          error,
-        } = await supabase
-          .from(
-            "place_category_relations"
-          )
-          .insert(rows);
-
-        if (error) {
-          throw new Error(
-            `カテゴリーの保存に失敗しました: ${error.message}`
-          );
-        }
-      }
-
-      if (
-        selectedProductIds.length >
-        0
-      ) {
-        const rows =
-          selectedProductIds.map(
-            (productId) => ({
-              place_id:
-                placeId,
-              product_id:
-                productId,
-              available: true,
-            })
-          );
-
-        const {
-          error,
-        } = await supabase
-          .from(
-            "place_products"
-          )
-          .insert(rows);
-
-        if (error) {
-          throw new Error(
-            `商品の紐づけに失敗しました: ${error.message}`
-          );
-        }
-      }
-
-      if (selectedStationId) {
-        const {
-          error,
-        } = await supabase
-          .from(
-            "place_access"
-          )
-          .insert({
-            place_id:
-              placeId,
-
-            station_id:
-              Number(
-                selectedStationId
-              ),
-
-            station_exit:
-              stationExit.trim() ||
-              null,
-
-            walk_minutes:
-              walkMinutes
-                ? Number(
-                    walkMinutes
-                  )
-                : null,
-          });
-
-        if (error) {
-          throw new Error(
-            `アクセス情報の保存に失敗しました: ${error.message}`
-          );
-        }
-      }
-
-      if (
-        placeImages.length >
-        0
-      ) {
-        const imageRows =
-          placeImages.map(
-            (image, index) => ({
-              place_id:
-                placeId,
-
-              image_url:
-                image.image_url,
-
-              alt_text:
-                image.alt_text.trim() ||
-                null,
-
-              sort_order:
-                index,
-            })
-          );
-
-        const {
-          error,
-        } = await supabase
-          .from(
-            "place_images"
-          )
-          .insert(
-            imageRows
-          );
-
-        if (error) {
-          throw new Error(
-            `写真の保存に失敗しました: ${error.message}`
-          );
-        }
-      }
-
-      setMessage(
-        "Placeを保存しました。"
-      );
-
-      setName("");
-      setDescription("");
-      setEditorNote("");
-
-      setPlaceTypeInput("");
-      setPlaceTypeId("");
-
-      setGroupInput("");
-      setGroupId("");
-
-      const tokyo =
-        regions.find(
-          (region) =>
-            region.name
-              .trim()
-              .toLowerCase() ===
-            "tokyo"
-        );
-
-      setRegionId(
-        tokyo
-          ? String(tokyo.id)
-          : ""
-      );
-
-      setAreaInput("");
-      setAreaId("");
-
-      setAddress("");
-      setPostalCode("");
-      setPhone("");
-
-      setPriceRange("");
-      setSeats("");
-      setCounterSeats("");
-      setTableSeats("");
-      setReservation("");
-
-      setEnglishSupport("");
-      setCard(false);
-      setTaxFree(false);
-
-      setOpeningHours("");
-      setClosedDays("");
-
-      setOfficialUrl("");
-      setInstagramUrl("");
-      setTabelogUrl("");
-      setGoogleMapsUrl("");
-
-      setStatus("draft");
-
-      setSelectedCategoryIds([]);
-      setSelectedProductIds([]);
-
-      setSelectedStationId("");
-      setStationExit("");
-      setWalkMinutes("");
-
-      setPlaceImages([]);
-
-      if (
-        resolvedPlaceTypeId &&
-        !placeTypes.some(
-          (type) =>
-            type.id ===
-            resolvedPlaceTypeId
-        )
-      ) {
-        setPlaceTypes(
-          (current) => [
-            ...current,
-            {
-              id:
-                resolvedPlaceTypeId,
-              name:
-                placeTypeInput.trim(),
-            },
-          ]
-        );
-      }
-
-      if (
-        resolvedGroupId &&
-        !groups.some(
-          (group) =>
-            String(
-              group.id
-            ) ===
-            resolvedGroupId
-        )
-      ) {
-        setGroups(
-          (current) => [
-            ...current,
-            {
-              id:
-                resolvedGroupId,
-              name:
-                groupInput.trim(),
-            },
-          ]
-        );
-      }
-
-      if (
-        resolvedAreaId &&
-        !areas.some(
-          (area) =>
-            area.id ===
-            resolvedAreaId
-        )
-      ) {
-        setAreas(
-          (current) => [
-            ...current,
-            {
-              id:
-                resolvedAreaId,
-              region_id:
-                Number(
-                  regionId
-                ),
-              name:
-                areaInput.trim(),
-            },
-          ]
-        );
-      }
-    } catch (error) {
-      setMessage(
-        error instanceof Error
-          ? error.message
-          : "保存に失敗しました。"
-      );
-    } finally {
+
+    const { data: place, error: placeError } = await supabase
+      .from("places")
+      .insert({
+        site_id: siteId,
+
+        place_type_id: placeTypeId
+          ? Number(placeTypeId)
+          : null,
+
+        region_id: regionId
+          ? Number(regionId)
+          : null,
+
+        area_id: areaId
+          ? Number(areaId)
+          : null,
+
+        name: name.trim(),
+
+        description: description || null,
+        editor_note: editorNote || null,
+
+        postal_code: postalCode || null,
+        address: address || null,
+
+        phone: phone || null,
+
+        price_range: priceRange || null,
+
+        seats: seats ? Number(seats) : null,
+        counter_seats: counterSeats
+          ? Number(counterSeats)
+          : null,
+        table_seats: tableSeats
+          ? Number(tableSeats)
+          : null,
+
+        reservation: reservation || null,
+        english_support: englishSupport || null,
+
+        card,
+        tax_free: taxFree,
+
+        opening_hours: openingHours || null,
+        closed_days: closedDays || null,
+
+        official_url: officialUrl || null,
+        instagram_url: instagramUrl || null,
+        tabelog_url: tabelogUrl || null,
+        google_maps_url: googleMapsUrl || null,
+
+        image_url: imageUrl || null,
+
+        status,
+      })
+      .select()
+      .single();
+
+    if (placeError) {
+      alert(placeError.message);
       setSaving(false);
+      return;
     }
+
+    const accessRows = selectedStations
+      .filter((station) => station.station_id)
+      .map((station, index) => ({
+        place_id: place.id,
+        station_id: Number(station.station_id),
+        station_exit: station.station_exit || null,
+        walk_minutes: station.walk_minutes
+          ? Number(station.walk_minutes)
+          : null,
+        sort_order: index,
+      }));
+
+    if (accessRows.length > 0) {
+      const { error: accessError } = await supabase
+        .from("place_access")
+        .insert(accessRows);
+
+      if (accessError) {
+        alert(accessError.message);
+        setSaving(false);
+        return;
+      }
+    }
+
+    router.push(`/admin/places/${place.id}`);
   }
 
-  function renderCategory(
-    category: CategoryNode,
-    level = 0
-  ): React.ReactNode {
+  if (loading) {
     return (
-      <div key={category.id}>
-        <label
-          style={{
-            ...styles.categoryOption,
-            marginLeft:
-              `${level * 22}px`,
-          }}
-        >
-          <input
-            type="checkbox"
-            checked={selectedCategoryIds.includes(
-              category.id
-            )}
-            onChange={() =>
-              toggleCategory(
-                category.id
-              )
-            }
-          />
-
-          {category.name}
-        </label>
-
-        {category.children.map(
-          (child) =>
-            renderCategory(
-              child,
-              level + 1
-            )
-        )}
-      </div>
+      <main style={{ padding: "40px" }}>
+        Loading...
+      </main>
     );
   }
 
   return (
-    <main style={styles.main}>
-      <div style={styles.container}>
-        <Link
-          href="/admin/places"
-          style={styles.back}
-        >
-          ← Places
-        </Link>
+    <main
+      style={{
+        maxWidth: "900px",
+        margin: "0 auto",
+        padding: "40px 24px 80px",
+      }}
+    >
+      <h1>Add Place</h1>
 
-        <header style={styles.header}>
-          <p style={styles.eyebrow}>
-            CONTENT / PLACES
-          </p>
+      <p style={{ color: "#666", marginBottom: "32px" }}>
+        Register a restaurant, shop, sightseeing spot, or other place.
+      </p>
 
-          <h1 style={styles.title}>
-            Add Place
-          </h1>
+      <form onSubmit={handleSubmit}>
+        {/* BASIC INFORMATION */}
 
-          <p style={styles.description}>
-            場所を登録します。Restaurant・Café・Shopなど、Placeの種類に応じて必要な情報だけ入力できます。
-          </p>
-        </header>
+        <Section title="Basic Information">
 
-        {loadingOptions ? (
-          <div style={styles.loading}>
-            読み込み中...
-          </div>
-        ) : (
-          <form
-            onSubmit={handleSubmit}
-            style={styles.form}
-          >
-            <section style={styles.section}>
-              <h2 style={styles.sectionTitle}>
-                Basic Information
-              </h2>
+          <Field label="Place Name *">
+            <input
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              required
+            />
+          </Field>
 
-              <label style={styles.label}>
-                Place name *
+          <Field label="Type">
+            <select
+              value={placeTypeId}
+              onChange={(e) =>
+                setPlaceTypeId(e.target.value)
+              }
+            >
+              <option value="">Select type</option>
 
-                <input
-                  style={styles.input}
-                  value={name}
-                  onChange={(e) =>
-                    setName(
-                      e.target.value
-                    )
-                  }
-                  placeholder="LOFT Shibuya"
-                  required
-                />
-              </label>
-
-              <label style={styles.label}>
-                Place Type
-
-                <input
-                  style={styles.input}
-                  list="place-type-options"
-                  value={placeTypeInput}
-                  onChange={(e) =>
-                    handlePlaceTypeChange(
-                      e.target.value
-                    )
-                  }
-                  placeholder="Shop"
-                />
-
-                <datalist id="place-type-options">
-                  {placeTypes.map(
-                    (type) => (
-                      <option
-                        key={type.id}
-                        value={type.name}
-                      />
-                    )
-                  )}
-                </datalist>
-              </label>
-
-              <label style={styles.label}>
-                Place Group
-
-                <input
-                  style={styles.input}
-                  list="place-group-options"
-                  value={groupInput}
-                  onChange={(e) =>
-                    handleGroupChange(
-                      e.target.value
-                    )
-                  }
-                  placeholder="No group"
-                />
-
-                <datalist id="place-group-options">
-                  {groups.map(
-                    (group) => (
-                      <option
-                        key={String(
-                          group.id
-                        )}
-                        value={group.name}
-                      />
-                    )
-                  )}
-                </datalist>
-              </label>
-
-              <div style={styles.row}>
-                <label style={styles.label}>
-                  Region
-
-                  <select
-                    style={
-                      styles.input
-                    }
-                    value={
-                      regionId
-                    }
-                    onChange={(e) =>
-                      handleRegionChange(
-                        e.target.value
-                      )
-                    }
-                  >
-                    <option value="">
-                      Select region
-                    </option>
-
-                    {regions.map(
-                      (region) => (
-                        <option
-                          key={String(
-                            region.id
-                          )}
-                          value={String(
-                            region.id
-                          )}
-                        >
-                          {
-                            region.name
-                          }
-                        </option>
-                      )
-                    )}
-                  </select>
-                </label>
-
-                <label style={styles.label}>
-                  Area
-
-                  <input
-                    style={
-                      styles.input
-                    }
-                    list="area-options"
-                    value={
-                      areaInput
-                    }
-                    onChange={(e) =>
-                      handleAreaChange(
-                        e.target.value
-                      )
-                    }
-                    disabled={
-                      !regionId
-                    }
-                    placeholder={
-                      regionId
-                        ? "Shibuya"
-                        : "Select region first"
-                    }
-                  />
-
-                  <datalist id="area-options">
-                    {filteredAreas.map(
-                      (area) => (
-                        <option
-                          key={area.id}
-                          value={
-                            area.name
-                          }
-                        />
-                      )
-                    )}
-                  </datalist>
-                </label>
-              </div>
-
-              <label style={styles.label}>
-                Description
-
-                <textarea
-                  style={
-                    styles.textarea
-                  }
-                  value={
-                    description
-                  }
-                  onChange={(e) =>
-                    setDescription(
-                      e.target.value
-                    )
-                  }
-                />
-              </label>
-
-              <label style={styles.label}>
-                Editor's note
-
-                <textarea
-                  style={
-                    styles.textareaSmall
-                  }
-                  value={
-                    editorNote
-                  }
-                  onChange={(e) =>
-                    setEditorNote(
-                      e.target.value
-                    )
-                  }
-                  placeholder="駅から近く、観光の途中にも立ち寄りやすい店舗です。"
-                />
-
-                <span
-                  style={
-                    styles.fieldHelp
-                  }
+              {placeTypes.map((type) => (
+                <option
+                  key={type.id}
+                  value={type.id}
                 >
-                  この店舗を東京ガイドに掲載する理由や、おすすめポイントを短く記載します。
-                </span>
-              </label>
-            </section>
+                  {type.name}
+                </option>
+              ))}
+            </select>
+          </Field>
 
-            <section style={styles.section}>
-              <h2 style={styles.sectionTitle}>
-                Categories
-              </h2>
+          <Field label="Region">
+            <select
+              value={regionId}
+              onChange={(e) => {
+                setRegionId(e.target.value);
+                setAreaId("");
+              }}
+            >
+              <option value="">Select region</option>
 
-              <p style={styles.helper}>
-                階層をたどってカテゴリーを複数選択できます。
-              </p>
+              {regions.map((region) => (
+                <option
+                  key={region.id}
+                  value={region.id}
+                >
+                  {region.name}
+                </option>
+              ))}
+            </select>
+          </Field>
 
-              <div
-                style={
-                  styles.categoryTree
-                }
-              >
-                {categoryTree.map(
-                  (category) =>
-                    renderCategory(
-                      category
-                    )
-                )}
-              </div>
-            </section>
+          <Field label="Area">
+            <select
+              value={areaId}
+              onChange={(e) =>
+                setAreaId(e.target.value)
+              }
+              disabled={!regionId}
+            >
+              <option value="">Select area</option>
 
-            <section style={styles.section}>
-              <h2 style={styles.sectionTitle}>
-                Photos
-              </h2>
+              {filteredAreas.map((area) => (
+                <option
+                  key={area.id}
+                  value={area.id}
+                >
+                  {area.name}
+                </option>
+              ))}
+            </select>
+          </Field>
 
-              <ImageGalleryUploader
-                images={placeImages}
-                onChange={setPlaceImages}
-                folder="places"
-              />
-            </section>
+          <Field label="Description">
+            <textarea
+              value={description}
+              onChange={(e) =>
+                setDescription(e.target.value)
+              }
+              rows={5}
+            />
+          </Field>
 
-            <section style={styles.section}>
-              <h2 style={styles.sectionTitle}>
-                Location
-              </h2>
+          <Field label="Editor Note">
+            <textarea
+              value={editorNote}
+              onChange={(e) =>
+                setEditorNote(e.target.value)
+              }
+              rows={4}
+            />
+          </Field>
 
-              <label style={styles.label}>
-                Address
+        </Section>
 
-                <input
-                  style={styles.input}
-                  value={address}
-                  onChange={(e) =>
-                    setAddress(
-                      e.target.value
-                    )
-                  }
-                />
-              </label>
 
-              <div style={styles.row}>
-                <label style={styles.label}>
-                  Postal code
+        {/* ADDRESS */}
 
-                  <input
-                    style={styles.input}
-                    value={
-                      postalCode
-                    }
-                    onChange={(e) =>
-                      setPostalCode(
-                        e.target.value
-                      )
-                    }
-                  />
-                </label>
+        <Section title="Location">
 
-                <label style={styles.label}>
-                  Phone
+          <Field label="Postal Code">
+            <input
+              value={postalCode}
+              onChange={(e) =>
+                setPostalCode(e.target.value)
+              }
+            />
+          </Field>
 
-                  <input
-                    style={styles.input}
-                    value={phone}
-                    onChange={(e) =>
-                      setPhone(
-                        e.target.value
-                      )
-                    }
-                  />
-                </label>
-              </div>
-            </section>
+          <Field label="Address">
+            <input
+              value={address}
+              onChange={(e) =>
+                setAddress(e.target.value)
+              }
+            />
+          </Field>
 
-            {isFoodPlace && (
-              <section style={styles.section}>
-                <h2 style={styles.sectionTitle}>
-                  Restaurant / Café
-                </h2>
+          <Field label="Google Maps URL">
+            <input
+              type="url"
+              value={googleMapsUrl}
+              onChange={(e) =>
+                setGoogleMapsUrl(e.target.value)
+              }
+            />
+          </Field>
 
-                <label style={styles.label}>
-                  Price range
+        </Section>
 
-                  <input
-                    style={styles.input}
-                    value={
-                      priceRange
-                    }
-                    onChange={(e) =>
-                      setPriceRange(
-                        e.target.value
-                      )
-                    }
-                    placeholder="¥ / ¥¥ / ¥¥¥"
-                  />
-                </label>
 
-                <div style={styles.row3}>
-                  <label style={styles.label}>
-                    Seats
+        {/* ACCESS */}
 
-                    <input
-                      style={
-                        styles.input
-                      }
-                      type="number"
-                      value={seats}
-                      onChange={(e) =>
-                        setSeats(
-                          e.target.value
-                        )
-                      }
-                    />
-                  </label>
+        <Section title="Access / Nearest Station">
 
-                  <label style={styles.label}>
-                    Counter seats
-
-                    <input
-                      style={
-                        styles.input
-                      }
-                      type="number"
-                      value={
-                        counterSeats
-                      }
-                      onChange={(e) =>
-                        setCounterSeats(
-                          e.target.value
-                        )
-                      }
-                    />
-                  </label>
-
-                  <label style={styles.label}>
-                    Table seats
-
-                    <input
-                      style={
-                        styles.input
-                      }
-                      type="number"
-                      value={
-                        tableSeats
-                      }
-                      onChange={(e) =>
-                        setTableSeats(
-                          e.target.value
-                        )
-                      }
-                    />
-                  </label>
-                </div>
-
-                <label style={styles.label}>
-                  Reservation
-
-                  <select
-                    style={
-                      styles.input
-                    }
-                    value={
-                      reservation
-                    }
-                    onChange={(e) =>
-                      setReservation(
-                        e.target.value
-                      )
-                    }
-                  >
-                    <option value="">
-                      Select
-                    </option>
-                    <option value="No">
-                      No
-                    </option>
-                    <option value="Yes">
-                      Yes
-                    </option>
-                    <option value="Required">
-                      Required
-                    </option>
-                    <option value="Recommended">
-                      Recommended
-                    </option>
-                  </select>
-                </label>
-              </section>
-            )}
-
-            <section style={styles.section}>
-              <h2 style={styles.sectionTitle}>
-                Practical Information
-              </h2>
-
-              <label style={styles.label}>
-                English support
-
+          {selectedStations.map((station, index) => (
+            <div
+              key={index}
+              style={{
+                border: "1px solid #ddd",
+                padding: "16px",
+                borderRadius: "8px",
+                marginBottom: "12px",
+              }}
+            >
+              <Field label="Station">
                 <select
-                  style={styles.input}
-                  value={
-                    englishSupport
-                  }
+                  value={station.station_id}
                   onChange={(e) =>
-                    setEnglishSupport(
-                      e.target.value
-                    )
-                  }
-                >
-                  <option value="">
-                    Select
-                  </option>
-                  <option value="Full">
-                    Full
-                  </option>
-                  <option value="Partial">
-                    Partial
-                  </option>
-                  <option value="None">
-                    None
-                  </option>
-                </select>
-              </label>
-
-              <div style={styles.checkRow}>
-                <label style={styles.checkbox}>
-                  <input
-                    type="checkbox"
-                    checked={card}
-                    onChange={(e) =>
-                      setCard(
-                        e.target.checked
-                      )
-                    }
-                  />
-                  Card accepted
-                </label>
-
-                <label style={styles.checkbox}>
-                  <input
-                    type="checkbox"
-                    checked={taxFree}
-                    onChange={(e) =>
-                      setTaxFree(
-                        e.target.checked
-                      )
-                    }
-                  />
-                  Tax free
-                </label>
-              </div>
-
-              <label style={styles.label}>
-                Opening hours
-
-                <textarea
-                  style={
-                    styles.textareaSmall
-                  }
-                  value={
-                    openingHours
-                  }
-                  onChange={(e) =>
-                    setOpeningHours(
-                      e.target.value
-                    )
-                  }
-                />
-              </label>
-
-              <label style={styles.label}>
-                Closed days
-
-                <input
-                  style={styles.input}
-                  value={closedDays}
-                  onChange={(e) =>
-                    setClosedDays(
-                      e.target.value
-                    )
-                  }
-                />
-              </label>
-            </section>
-
-            <section style={styles.section}>
-              <h2 style={styles.sectionTitle}>
-                Products sold here
-              </h2>
-
-              {products.length === 0 ? (
-                <p style={styles.helper}>
-                  Productsがまだありません。
-                </p>
-              ) : (
-                <div
-                  style={
-                    styles.optionGrid
-                  }
-                >
-                  {products.map(
-                    (product) => (
-                      <label
-                        key={String(
-                          product.id
-                        )}
-                        style={
-                          styles.checkbox
-                        }
-                      >
-                        <input
-                          type="checkbox"
-                          checked={selectedProductIds.includes(
-                            String(
-                              product.id
-                            )
-                          )}
-                          onChange={() =>
-                            toggleProduct(
-                              String(
-                                product.id
-                              )
-                            )
-                          }
-                        />
-                        {product.name}
-                      </label>
-                    )
-                  )}
-                </div>
-              )}
-            </section>
-
-            <section style={styles.section}>
-              <h2 style={styles.sectionTitle}>
-                Access
-              </h2>
-
-              <label style={styles.label}>
-                Nearest station
-
-                <select
-                  style={styles.input}
-                  value={
-                    selectedStationId
-                  }
-                  onChange={(e) =>
-                    setSelectedStationId(
+                    updateStation(
+                      index,
+                      "station_id",
                       e.target.value
                     )
                   }
@@ -1568,394 +486,376 @@ export default function NewPlacePage() {
                     Select station
                   </option>
 
-                  {stations.map(
-                    (station) => (
-                      <option
-                        key={String(
-                          station.id
-                        )}
-                        value={String(
-                          station.id
-                        )}
-                      >
-                        {
-                          station.name
-                        }
-                      </option>
-                    )
-                  )}
+                  {stations.map((s) => (
+                    <option
+                      key={s.id}
+                      value={s.id}
+                    >
+                      {s.name}
+                    </option>
+                  ))}
                 </select>
-              </label>
+              </Field>
 
-              <div style={styles.row}>
-                <label style={styles.label}>
-                  Exit
-
-                  <input
-                    style={styles.input}
-                    value={
-                      stationExit
-                    }
-                    onChange={(e) =>
-                      setStationExit(
-                        e.target.value
-                      )
-                    }
-                  />
-                </label>
-
-                <label style={styles.label}>
-                  Walk minutes
-
-                  <input
-                    style={styles.input}
-                    type="number"
-                    value={
-                      walkMinutes
-                    }
-                    onChange={(e) =>
-                      setWalkMinutes(
-                        e.target.value
-                      )
-                    }
-                  />
-                </label>
-              </div>
-            </section>
-
-            <section style={styles.section}>
-              <h2 style={styles.sectionTitle}>
-                Links
-              </h2>
-
-              <label style={styles.label}>
-                Official website
-
+              <Field label="Exit">
                 <input
-                  style={styles.input}
-                  value={officialUrl}
+                  value={station.station_exit}
                   onChange={(e) =>
-                    setOfficialUrl(
+                    updateStation(
+                      index,
+                      "station_exit",
                       e.target.value
                     )
                   }
                 />
-              </label>
+              </Field>
 
-              <label style={styles.label}>
-                Instagram
-
+              <Field label="Walk Minutes">
                 <input
-                  style={styles.input}
-                  value={
-                    instagramUrl
-                  }
+                  type="number"
+                  min="0"
+                  value={station.walk_minutes}
                   onChange={(e) =>
-                    setInstagramUrl(
+                    updateStation(
+                      index,
+                      "walk_minutes",
                       e.target.value
                     )
                   }
                 />
-              </label>
+              </Field>
 
-              <label style={styles.label}>
-                Tabelog
+              <button
+                type="button"
+                onClick={() =>
+                  removeStation(index)
+                }
+              >
+                Remove
+              </button>
+            </div>
+          ))}
 
-                <input
-                  style={styles.input}
-                  value={
-                    tabelogUrl
-                  }
-                  onChange={(e) =>
-                    setTabelogUrl(
-                      e.target.value
-                    )
-                  }
-                />
-              </label>
+          <button
+            type="button"
+            onClick={addStation}
+          >
+            + Add Station
+          </button>
 
-              <label style={styles.label}>
-                Google Maps
+        </Section>
 
-                <input
-                  style={styles.input}
-                  value={
-                    googleMapsUrl
-                  }
-                  onChange={(e) =>
-                    setGoogleMapsUrl(
-                      e.target.value
-                    )
-                  }
-                />
-              </label>
-            </section>
 
-            <section style={styles.section}>
-              <h2 style={styles.sectionTitle}>
-                Publishing
-              </h2>
+        {/* CONTACT */}
 
-              <p style={styles.publishingHelp}>
-                東京ガイドでは、掲載する店舗を編集部が選定します。Editor's noteに、この店舗を選んだ理由やおすすめポイントを記載してください。
-              </p>
+        <Section title="Contact">
 
-              <label style={styles.label}>
-                Status
+          <Field label="Phone">
+            <input
+              value={phone}
+              onChange={(e) =>
+                setPhone(e.target.value)
+              }
+            />
+          </Field>
 
-                <select
-                  style={styles.input}
-                  value={status}
-                  onChange={(e) =>
-                    setStatus(
-                      e.target.value
-                    )
-                  }
-                >
-                  <option value="draft">
-                    Draft
-                  </option>
-                  <option value="published">
-                    Published
-                  </option>
-                  <option value="hidden">
-                    Hidden
-                  </option>
-                  <option value="archived">
-                    Archived
-                  </option>
-                </select>
-              </label>
-            </section>
+          <Field label="Official Website">
+            <input
+              type="url"
+              value={officialUrl}
+              onChange={(e) =>
+                setOfficialUrl(e.target.value)
+              }
+            />
+          </Field>
 
-            <button
-              type="submit"
-              disabled={saving}
-              style={{
-                ...styles.saveButton,
-                opacity:
-                  saving ? 0.6 : 1,
-              }}
-            >
-              {saving
-                ? "Saving..."
-                : "Save Place"}
-            </button>
+          <Field label="Instagram">
+            <input
+              type="url"
+              value={instagramUrl}
+              onChange={(e) =>
+                setInstagramUrl(e.target.value)
+              }
+            />
+          </Field>
 
-            {message && (
-              <div style={styles.message}>
-                {message}
-              </div>
-            )}
-          </form>
-        )}
-      </div>
+          <Field label="Tabelog">
+            <input
+              type="url"
+              value={tabelogUrl}
+              onChange={(e) =>
+                setTabelogUrl(e.target.value)
+              }
+            />
+          </Field>
+
+        </Section>
+
+
+        {/* BUSINESS INFORMATION */}
+
+        <Section title="Business Information">
+
+          <Field label="Price Range">
+            <input
+              value={priceRange}
+              onChange={(e) =>
+                setPriceRange(e.target.value)
+              }
+              placeholder="¥¥"
+            />
+          </Field>
+
+          <Field label="Seats">
+            <input
+              type="number"
+              min="0"
+              value={seats}
+              onChange={(e) =>
+                setSeats(e.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="Counter Seats">
+            <input
+              type="number"
+              min="0"
+              value={counterSeats}
+              onChange={(e) =>
+                setCounterSeats(e.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="Table Seats">
+            <input
+              type="number"
+              min="0"
+              value={tableSeats}
+              onChange={(e) =>
+                setTableSeats(e.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="Reservation">
+            <input
+              value={reservation}
+              onChange={(e) =>
+                setReservation(e.target.value)
+              }
+            />
+          </Field>
+
+          <Field label="English Support">
+            <input
+              value={englishSupport}
+              onChange={(e) =>
+                setEnglishSupport(e.target.value)
+              }
+            />
+          </Field>
+
+          <label
+            style={{
+              display: "flex",
+              gap: "8px",
+              marginTop: "16px",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={card}
+              onChange={(e) =>
+                setCard(e.target.checked)
+              }
+            />
+
+            Credit Cards Accepted
+          </label>
+
+          <label
+            style={{
+              display: "flex",
+              gap: "8px",
+              marginTop: "12px",
+            }}
+          >
+            <input
+              type="checkbox"
+              checked={taxFree}
+              onChange={(e) =>
+                setTaxFree(e.target.checked)
+              }
+            />
+
+            Tax Free
+          </label>
+
+        </Section>
+
+
+        {/* OPENING HOURS */}
+
+        <Section title="Opening Hours">
+
+          <Field label="Opening Hours">
+            <textarea
+              value={openingHours}
+              onChange={(e) =>
+                setOpeningHours(e.target.value)
+              }
+              rows={4}
+            />
+          </Field>
+
+          <Field label="Closed Days">
+            <input
+              value={closedDays}
+              onChange={(e) =>
+                setClosedDays(e.target.value)
+              }
+            />
+          </Field>
+
+        </Section>
+
+
+        {/* IMAGE */}
+
+        <Section title="Image">
+
+          <Field label="Image URL">
+            <input
+              type="url"
+              value={imageUrl}
+              onChange={(e) =>
+                setImageUrl(e.target.value)
+              }
+            />
+          </Field>
+
+        </Section>
+
+
+        {/* STATUS */}
+
+        <Section title="Status">
+
+          <select
+            value={status}
+            onChange={(e) =>
+              setStatus(e.target.value)
+            }
+          >
+            <option value="draft">
+              Draft
+            </option>
+
+            <option value="published">
+              Published
+            </option>
+
+            <option value="hidden">
+              Hidden
+            </option>
+
+            <option value="archived">
+              Archived
+            </option>
+          </select>
+
+        </Section>
+
+
+        {/* SAVE */}
+
+        <button
+          type="submit"
+          disabled={saving}
+          style={{
+            width: "100%",
+            padding: "16px",
+            background: "#111",
+            color: "#fff",
+            border: "none",
+            borderRadius: "8px",
+            fontSize: "16px",
+            cursor: "pointer",
+            marginTop: "20px",
+          }}
+        >
+          {saving ? "Saving..." : "Save Place"}
+        </button>
+
+      </form>
     </main>
   );
 }
 
-const styles = {
-  main: {
-    minHeight: "100vh",
-    background: "#faf8f6",
-    color: "#222",
-    padding: "40px 24px 90px",
-  },
 
-  container: {
-    maxWidth: "900px",
-    margin: "0 auto",
-  },
+function Section({
+  title,
+  children,
+}: {
+  title: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section
+      style={{
+        marginBottom: "32px",
+        padding: "24px",
+        border: "1px solid #e5e5e5",
+        borderRadius: "12px",
+      }}
+    >
+      <h2
+        style={{
+          marginTop: 0,
+          fontSize: "20px",
+        }}
+      >
+        {title}
+      </h2>
 
-  back: {
-    color: "#777",
-    textDecoration: "none",
-    fontSize: "13px",
-  },
+      {children}
+    </section>
+  );
+}
 
-  header: {
-    padding: "35px 0 28px",
-  },
 
-  eyebrow: {
-    color: "#c8647b",
-    fontSize: "10px",
-    fontWeight: 700,
-    letterSpacing: "3px",
-    marginBottom: "8px",
-  },
+function Field({
+  label,
+  children,
+}: {
+  label: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      style={{
+        marginBottom: "18px",
+      }}
+    >
+      <label
+        style={{
+          display: "block",
+          marginBottom: "7px",
+          fontWeight: 600,
+        }}
+      >
+        {label}
+      </label>
 
-  title: {
-    fontFamily: "Georgia, serif",
-    fontSize: "48px",
-    fontWeight: 400,
-    margin: 0,
-  },
-
-  description: {
-    color: "#777",
-    lineHeight: 1.7,
-    marginTop: "10px",
-  },
-
-  loading: {
-    background: "#fff",
-    border: "1px solid #e7e0dc",
-    borderRadius: "15px",
-    padding: "30px",
-    textAlign: "center" as const,
-    color: "#888",
-  },
-
-  form: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "18px",
-  },
-
-  section: {
-    background: "#fff",
-    border: "1px solid #e7e0dc",
-    borderRadius: "15px",
-    padding: "22px",
-  },
-
-  sectionTitle: {
-    fontFamily: "Georgia, serif",
-    fontSize: "24px",
-    fontWeight: 400,
-    marginTop: 0,
-    marginBottom: "18px",
-  },
-
-  label: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "7px",
-    fontSize: "13px",
-    fontWeight: 600,
-    marginBottom: "14px",
-  },
-
-  input: {
-    width: "100%",
-    boxSizing: "border-box" as const,
-    padding: "12px 13px",
-    border: "1px solid #ded7d3",
-    borderRadius: "9px",
-    background: "#fff",
-    fontSize: "14px",
-  },
-
-  textarea: {
-    width: "100%",
-    minHeight: "120px",
-    boxSizing: "border-box" as const,
-    padding: "12px 13px",
-    border: "1px solid #ded7d3",
-    borderRadius: "9px",
-    background: "#fff",
-    fontSize: "14px",
-    resize: "vertical" as const,
-  },
-
-  textareaSmall: {
-    width: "100%",
-    minHeight: "80px",
-    boxSizing: "border-box" as const,
-    padding: "12px 13px",
-    border: "1px solid #ded7d3",
-    borderRadius: "9px",
-    background: "#fff",
-    fontSize: "14px",
-    resize: "vertical" as const,
-  },
-
-  row: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(2, minmax(0, 1fr))",
-    gap: "12px",
-  },
-
-  row3: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(3, minmax(0, 1fr))",
-    gap: "12px",
-  },
-
-  checkRow: {
-    display: "flex",
-    gap: "25px",
-    flexWrap: "wrap" as const,
-    marginBottom: "15px",
-  },
-
-  checkbox: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    fontSize: "13px",
-    fontWeight: 400,
-  },
-
-  fieldHelp: {
-    color: "#999",
-    fontSize: "11px",
-    fontWeight: 400,
-    lineHeight: 1.5,
-  },
-
-  helper: {
-    color: "#888",
-    fontSize: "12px",
-    lineHeight: 1.6,
-  },
-
-  publishingHelp: {
-    color: "#777",
-    fontSize: "12px",
-    lineHeight: 1.7,
-    margin: "0 0 18px",
-  },
-
-  categoryTree: {
-    borderTop: "1px solid #eee8e4",
-    paddingTop: "10px",
-    maxHeight: "300px",
-    overflowY: "auto" as const,
-  },
-
-  categoryOption: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "8px 0",
-    fontSize: "13px",
-    fontWeight: 400,
-  },
-
-  optionGrid: {
-    display: "grid",
-    gridTemplateColumns:
-      "repeat(2, minmax(0, 1fr))",
-    gap: "10px",
-  },
-
-  saveButton: {
-    border: 0,
-    borderRadius: "11px",
-    background: "#222",
-    color: "#fff",
-    padding: "16px",
-    fontSize: "14px",
-    cursor: "pointer",
-  },
-
-  message: {
-    textAlign: "center" as const,
-    color: "#c8647b",
-    fontSize: "13px",
-  },
-};
+      <div
+        style={{
+          width: "100%",
+        }}
+      >
+        {children}
+      </div>
+    </div>
+  );
+}
