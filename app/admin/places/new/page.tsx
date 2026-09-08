@@ -10,20 +10,21 @@ type PlaceType = {
   name: string;
 };
 
-type Region = {
-  id: number;
-  name: string;
-};
-
 type Area = {
   id: number;
-  region_id: number;
   name: string;
 };
 
 type Station = {
   id: number;
   name: string;
+};
+
+type AccessRow = {
+  station_id: string;
+  station_name: string;
+  station_exit: string;
+  walk_minutes: string;
 };
 
 export default function NewPlacePage() {
@@ -36,50 +37,60 @@ export default function NewPlacePage() {
   const [siteId, setSiteId] = useState("");
 
   const [placeTypes, setPlaceTypes] = useState<PlaceType[]>([]);
-  const [regions, setRegions] = useState<Region[]>([]);
   const [areas, setAreas] = useState<Area[]>([]);
   const [stations, setStations] = useState<Station[]>([]);
 
+  // Basic
   const [name, setName] = useState("");
   const [placeTypeId, setPlaceTypeId] = useState("");
-  const [regionId, setRegionId] = useState("");
-  const [areaId, setAreaId] = useState("");
+
+  // Areaは自由入力
+  const [areaName, setAreaName] = useState("");
 
   const [description, setDescription] = useState("");
   const [editorNote, setEditorNote] = useState("");
 
+  // Location
   const [postalCode, setPostalCode] = useState("");
   const [address, setAddress] = useState("");
+  const [googleMapsUrl, setGoogleMapsUrl] = useState("");
 
+  // Contact
   const [phone, setPhone] = useState("");
+  const [officialUrl, setOfficialUrl] = useState("");
+  const [instagramUrl, setInstagramUrl] = useState("");
+  const [tabelogUrl, setTabelogUrl] = useState("");
 
+  // Store information
   const [priceRange, setPriceRange] = useState("");
+  const [reservation, setReservation] = useState("");
+  const [englishSupport, setEnglishSupport] = useState("");
+
+  const [openingHours, setOpeningHours] = useState("");
+  const [closedDays, setClosedDays] = useState("");
 
   const [seats, setSeats] = useState("");
   const [counterSeats, setCounterSeats] = useState("");
   const [tableSeats, setTableSeats] = useState("");
 
-  const [reservation, setReservation] = useState("");
-  const [englishSupport, setEnglishSupport] = useState("");
-
   const [card, setCard] = useState(false);
   const [taxFree, setTaxFree] = useState(false);
 
-  const [openingHours, setOpeningHours] = useState("");
-  const [closedDays, setClosedDays] = useState("");
-
-  const [officialUrl, setOfficialUrl] = useState("");
-  const [instagramUrl, setInstagramUrl] = useState("");
-  const [tabelogUrl, setTabelogUrl] = useState("");
-  const [googleMapsUrl, setGoogleMapsUrl] = useState("");
-
+  // Image
   const [imageUrl, setImageUrl] = useState("");
 
-  const [stationId, setStationId] = useState("");
-  const [stationExit, setStationExit] = useState("");
-  const [walkMinutes, setWalkMinutes] = useState("");
-
+  // Publishing
   const [status, setStatus] = useState("draft");
+
+  // Multiple access
+  const [accessRows, setAccessRows] = useState<AccessRow[]>([
+    {
+      station_id: "",
+      station_name: "",
+      station_exit: "",
+      walk_minutes: "",
+    },
+  ]);
 
   useEffect(() => {
     loadInitialData();
@@ -97,8 +108,7 @@ export default function NewPlacePage() {
 
     if (siteError || !site) {
       setErrorMessage(
-        siteError?.message ||
-          "TOKYO GUIDE site could not be found."
+        siteError?.message || "TOKYO GUIDE site could not be found."
       );
       setLoading(false);
       return;
@@ -106,36 +116,33 @@ export default function NewPlacePage() {
 
     setSiteId(site.id);
 
-    const [
-      placeTypesResult,
-      regionsResult,
-      stationsResult,
-    ] = await Promise.all([
-      supabase
-        .from("place_types")
-        .select("id, name")
-        .eq("site_id", site.id)
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true }),
+    const [typesResult, areasResult, stationsResult] =
+      await Promise.all([
+        supabase
+          .from("place_types")
+          .select("id, name")
+          .eq("site_id", site.id)
+          .eq("is_active", true)
+          .order("sort_order"),
 
-      supabase
-        .from("regions")
-        .select("id, name")
-        .eq("site_id", site.id)
-        .eq("is_active", true)
-        .order("sort_order", { ascending: true }),
+        supabase
+          .from("areas")
+          .select("id, name")
+          .eq("site_id", site.id)
+          .eq("is_active", true)
+          .order("name"),
 
-      supabase
-        .from("stations")
-        .select("id, name")
-        .eq("site_id", site.id)
-        .eq("is_active", true)
-        .order("name", { ascending: true }),
-    ]);
+        supabase
+          .from("stations")
+          .select("id, name")
+          .eq("site_id", site.id)
+          .eq("is_active", true)
+          .order("name"),
+      ]);
 
     const firstError =
-      placeTypesResult.error ||
-      regionsResult.error ||
+      typesResult.error ||
+      areasResult.error ||
       stationsResult.error;
 
     if (firstError) {
@@ -144,35 +151,11 @@ export default function NewPlacePage() {
       return;
     }
 
-    setPlaceTypes(placeTypesResult.data ?? []);
-    setRegions(regionsResult.data ?? []);
+    setPlaceTypes(typesResult.data ?? []);
+    setAreas(areasResult.data ?? []);
     setStations(stationsResult.data ?? []);
 
     setLoading(false);
-  }
-
-  async function handleRegionChange(
-    newRegionId: string
-  ) {
-    setRegionId(newRegionId);
-    setAreaId("");
-    setAreas([]);
-
-    if (!newRegionId) return;
-
-    const { data, error } = await supabase
-      .from("areas")
-      .select("id, region_id, name")
-      .eq("region_id", Number(newRegionId))
-      .eq("is_active", true)
-      .order("sort_order", { ascending: true });
-
-    if (error) {
-      setErrorMessage(error.message);
-      return;
-    }
-
-    setAreas(data ?? []);
   }
 
   function createSlug(value: string) {
@@ -183,6 +166,96 @@ export default function NewPlacePage() {
       .replace(/\s+/g, "-")
       .replace(/-+/g, "-");
   }
+
+  // ------------------------------------------
+  // ACCESS
+  // ------------------------------------------
+
+  function addAccessRow() {
+    setAccessRows([
+      ...accessRows,
+      {
+        station_id: "",
+        station_name: "",
+        station_exit: "",
+        walk_minutes: "",
+      },
+    ]);
+  }
+
+  function removeAccessRow(index: number) {
+    setAccessRows(accessRows.filter((_, i) => i !== index));
+  }
+
+  function updateAccessRow(
+    index: number,
+    field: keyof AccessRow,
+    value: string
+  ) {
+    const updated = [...accessRows];
+
+    updated[index] = {
+      ...updated[index],
+      [field]: value,
+    };
+
+    if (field === "station_id") {
+      const selectedStation = stations.find(
+        (station) => String(station.id) === value
+      );
+
+      updated[index].station_name =
+        selectedStation?.name ?? "";
+    }
+
+    setAccessRows(updated);
+  }
+
+  // ------------------------------------------
+  // AREA
+  // ------------------------------------------
+
+  async function getOrCreateAreaId(): Promise<number | null> {
+    const trimmedName = areaName.trim();
+
+    if (!trimmedName) {
+      return null;
+    }
+
+    // 既存Areaを探す
+    const existingArea = areas.find(
+      (area) =>
+        area.name.toLowerCase() === trimmedName.toLowerCase()
+    );
+
+    if (existingArea) {
+      return existingArea.id;
+    }
+
+    // 新しいAreaを作成
+    const { data: newArea, error } = await supabase
+      .from("areas")
+      .insert({
+        site_id: siteId,
+        name: trimmedName,
+        slug: createSlug(trimmedName),
+        is_active: true,
+      })
+      .select("id, name")
+      .single();
+
+    if (error || !newArea) {
+      throw new Error(
+        error?.message || "Failed to create area."
+      );
+    }
+
+    return newArea.id;
+  }
+
+  // ------------------------------------------
+  // SAVE
+  // ------------------------------------------
 
   async function handleSave() {
     setErrorMessage("");
@@ -199,103 +272,121 @@ export default function NewPlacePage() {
 
     setSaving(true);
 
-    const { data: newPlace, error } = await supabase
-      .from("places")
-      .insert({
-        site_id: siteId,
+    try {
+      // Areaを取得または新規作成
+      const areaId = await getOrCreateAreaId();
 
-        place_type_id: placeTypeId
-          ? Number(placeTypeId)
-          : null,
+      // Place作成
+      const { data: newPlace, error: placeError } =
+        await supabase
+          .from("places")
+          .insert({
+            site_id: siteId,
 
-        region_id: regionId
-          ? Number(regionId)
-          : null,
+            place_type_id: placeTypeId
+              ? Number(placeTypeId)
+              : null,
 
-        area_id: areaId
-          ? Number(areaId)
-          : null,
+            area_id: areaId,
 
-        name: name.trim(),
-        slug: createSlug(name),
+            name: name.trim(),
+            slug: createSlug(name),
 
-        description: description || null,
-        editor_note: editorNote || null,
+            description: description || null,
+            editor_note: editorNote || null,
 
-        postal_code: postalCode || null,
-        address: address || null,
+            postal_code: postalCode || null,
+            address: address || null,
+            google_maps_url: googleMapsUrl || null,
 
-        phone: phone || null,
+            phone: phone || null,
 
-        price_range: priceRange || null,
+            official_url: officialUrl || null,
+            instagram_url: instagramUrl || null,
+            tabelog_url: tabelogUrl || null,
 
-        seats: seats ? Number(seats) : null,
-        counter_seats: counterSeats
-          ? Number(counterSeats)
-          : null,
-        table_seats: tableSeats
-          ? Number(tableSeats)
-          : null,
+            price_range: priceRange || null,
+            reservation: reservation || null,
+            english_support: englishSupport || null,
 
-        reservation: reservation || null,
-        english_support: englishSupport || null,
+            opening_hours: openingHours || null,
+            closed_days: closedDays || null,
 
-        card,
-        tax_free: taxFree,
+            seats: seats ? Number(seats) : null,
+            counter_seats: counterSeats
+              ? Number(counterSeats)
+              : null,
+            table_seats: tableSeats
+              ? Number(tableSeats)
+              : null,
 
-        opening_hours: openingHours || null,
-        closed_days: closedDays || null,
+            card,
+            tax_free: taxFree,
 
-        official_url: officialUrl || null,
-        instagram_url: instagramUrl || null,
-        tabelog_url: tabelogUrl || null,
-        google_maps_url: googleMapsUrl || null,
+            image_url: imageUrl || null,
 
-        image_url: imageUrl || null,
+            status,
+          })
+          .select("id")
+          .single();
 
-        status,
-      })
-      .select("id")
-      .single();
-
-    if (error || !newPlace) {
-      setErrorMessage(
-        error?.message ||
-          "Failed to save the place."
-      );
-      setSaving(false);
-      return;
-    }
-
-    if (stationId) {
-      const { error: accessError } = await supabase
-        .from("place_access")
-        .insert({
-          place_id: newPlace.id,
-          station_id: Number(stationId),
-          station_exit: stationExit || null,
-          walk_minutes: walkMinutes
-            ? Number(walkMinutes)
-            : null,
-        });
-
-      if (accessError) {
-        setErrorMessage(
-          `Place was saved, but station information could not be saved: ${accessError.message}`
+      if (placeError || !newPlace) {
+        throw new Error(
+          placeError?.message || "Failed to save place."
         );
-        setSaving(false);
-        return;
       }
-    }
 
-    router.push(`/admin/places/${newPlace.id}`);
-    router.refresh();
+      // ------------------------------------------
+      // Multiple Stations
+      // ------------------------------------------
+
+      const validAccessRows = accessRows.filter(
+        (row) => row.station_id
+      );
+
+      if (validAccessRows.length > 0) {
+        const accessData = validAccessRows.map(
+          (row, index) => ({
+            place_id: newPlace.id,
+            station_id: Number(row.station_id),
+            station_exit: row.station_exit || null,
+            walk_minutes: row.walk_minutes
+              ? Number(row.walk_minutes)
+              : null,
+            sort_order: index,
+          })
+        );
+
+        const { error: accessError } = await supabase
+          .from("place_access")
+          .insert(accessData);
+
+        if (accessError) {
+          throw new Error(
+            `Place was saved, but access information failed: ${accessError.message}`
+          );
+        }
+      }
+
+      router.push(`/admin/places/${newPlace.id}`);
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong."
+      );
+    } finally {
+      setSaving(false);
+    }
   }
 
   if (loading) {
     return (
       <main style={styles.page}>
-        <p>Loading...</p>
+        <div style={styles.loading}>
+          Loading your Tokyo Guide...
+        </div>
       </main>
     );
   }
@@ -303,34 +394,33 @@ export default function NewPlacePage() {
   return (
     <main style={styles.page}>
       <div style={styles.container}>
-        <div style={styles.top}>
+
+        {/* HEADER */}
+
+        <div style={styles.header}>
           <div>
             <Link
               href="/admin/places"
               style={styles.backLink}
             >
-              ← Places
+              ← Back to Places
             </Link>
 
             <h1 style={styles.title}>
-              Add New Place
+              ✦ Add a New Place
             </h1>
 
             <p style={styles.subtitle}>
-              Register a restaurant, shop, sightseeing spot, or other place.
+              Add your favorite spot to TOKYO GUIDE
             </p>
           </div>
 
           <button
-            type="button"
             onClick={handleSave}
             disabled={saving}
-            style={{
-              ...styles.saveButton,
-              opacity: saving ? 0.6 : 1,
-            }}
+            style={styles.saveButton}
           >
-            {saving ? "Saving..." : "Save Place"}
+            {saving ? "Saving..." : "Save Place ✦"}
           </button>
         </div>
 
@@ -340,15 +430,25 @@ export default function NewPlacePage() {
           </div>
         )}
 
-        {/* BASIC INFORMATION */}
+        {/* BASIC */}
 
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>
-            Basic Information
-          </h2>
+        <section style={styles.card}>
+          <div style={styles.cardHeader}>
+            <span style={styles.icon}>✦</span>
 
-          <div style={styles.grid}>
-            <div style={styles.fullWidth}>
+            <div>
+              <h2 style={styles.sectionTitle}>
+                Basic Information
+              </h2>
+
+              <p style={styles.sectionText}>
+                The essentials
+              </p>
+            </div>
+          </div>
+
+          <div style={styles.formGrid}>
+            <div style={styles.full}>
               <label style={styles.label}>
                 Place Name *
               </label>
@@ -390,66 +490,35 @@ export default function NewPlacePage() {
 
             <div>
               <label style={styles.label}>
-                Region
-              </label>
-
-              <select
-                value={regionId}
-                onChange={(e) =>
-                  handleRegionChange(e.target.value)
-                }
-                style={styles.input}
-              >
-                <option value="">
-                  Select region
-                </option>
-
-                {regions.map((region) => (
-                  <option
-                    key={region.id}
-                    value={region.id}
-                  >
-                    {region.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={styles.label}>
                 Area
               </label>
 
-              <select
-                value={areaId}
+              <input
+                list="area-options"
+                value={areaName}
                 onChange={(e) =>
-                  setAreaId(e.target.value)
+                  setAreaName(e.target.value)
                 }
-                disabled={!regionId}
-                style={{
-                  ...styles.input,
-                  opacity: regionId ? 1 : 0.5,
-                }}
-              >
-                <option value="">
-                  {regionId
-                    ? "Select area"
-                    : "Select region first"}
-                </option>
+                placeholder="Type a new area or choose one"
+                style={styles.input}
+              />
 
+              <datalist id="area-options">
                 {areas.map((area) => (
                   <option
                     key={area.id}
-                    value={area.id}
-                  >
-                    {area.name}
-                  </option>
+                    value={area.name}
+                  />
                 ))}
-              </select>
+              </datalist>
+
+              <p style={styles.helper}>
+                You can type a new area anytime ✦
+              </p>
             </div>
           </div>
 
-          <div style={styles.fullWidth}>
+          <div style={styles.full}>
             <label style={styles.label}>
               Description
             </label>
@@ -459,12 +528,12 @@ export default function NewPlacePage() {
               onChange={(e) =>
                 setDescription(e.target.value)
               }
-              placeholder="Write the description shown to visitors..."
+              placeholder="Tell visitors why this place is special..."
               style={styles.textarea}
             />
           </div>
 
-          <div style={styles.fullWidth}>
+          <div style={styles.full}>
             <label style={styles.label}>
               Editor Note
             </label>
@@ -474,20 +543,26 @@ export default function NewPlacePage() {
               onChange={(e) =>
                 setEditorNote(e.target.value)
               }
-              placeholder="Private editorial notes..."
-              style={styles.textarea}
+              placeholder="Your private notes..."
+              style={styles.textareaSmall}
             />
           </div>
         </section>
 
         {/* LOCATION */}
 
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>
-            Location
-          </h2>
+        <section style={styles.card}>
+          <div style={styles.cardHeader}>
+            <span style={styles.icon}>📍</span>
 
-          <div style={styles.grid}>
+            <div>
+              <h2 style={styles.sectionTitle}>
+                Location
+              </h2>
+            </div>
+          </div>
+
+          <div style={styles.formGrid}>
             <div>
               <label style={styles.label}>
                 Postal Code
@@ -498,7 +573,6 @@ export default function NewPlacePage() {
                 onChange={(e) =>
                   setPostalCode(e.target.value)
                 }
-                placeholder="e.g. 111-0032"
                 style={styles.input}
               />
             </div>
@@ -513,12 +587,12 @@ export default function NewPlacePage() {
                 onChange={(e) =>
                   setGoogleMapsUrl(e.target.value)
                 }
-                placeholder="https://..."
+                placeholder="Paste Google Maps link"
                 style={styles.input}
               />
             </div>
 
-            <div style={styles.fullWidth}>
+            <div style={styles.full}>
               <label style={styles.label}>
                 Address
               </label>
@@ -537,21 +611,34 @@ export default function NewPlacePage() {
 
         {/* ACCESS */}
 
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>
-            Access
-          </h2>
+        <section style={styles.card}>
+          <div style={styles.cardHeader}>
+            <span style={styles.icon}>🚃</span>
 
-          <div style={styles.grid}>
             <div>
-              <label style={styles.label}>
-                Nearest Station
-              </label>
+              <h2 style={styles.sectionTitle}>
+                Access
+              </h2>
 
+              <p style={styles.sectionText}>
+                Add as many nearby stations as you want
+              </p>
+            </div>
+          </div>
+
+          {accessRows.map((row, index) => (
+            <div
+              key={index}
+              style={styles.accessRow}
+            >
               <select
-                value={stationId}
+                value={row.station_id}
                 onChange={(e) =>
-                  setStationId(e.target.value)
+                  updateAccessRow(
+                    index,
+                    "station_id",
+                    e.target.value
+                  )
                 }
                 style={styles.input}
               >
@@ -568,60 +655,77 @@ export default function NewPlacePage() {
                   </option>
                 ))}
               </select>
-            </div>
-
-            <div>
-              <label style={styles.label}>
-                Station Exit
-              </label>
 
               <input
-                value={stationExit}
+                value={row.station_exit}
                 onChange={(e) =>
-                  setStationExit(e.target.value)
+                  updateAccessRow(
+                    index,
+                    "station_exit",
+                    e.target.value
+                  )
                 }
-                placeholder="e.g. Exit A1"
+                placeholder="Exit"
                 style={styles.input}
               />
-            </div>
-
-            <div>
-              <label style={styles.label}>
-                Walk Minutes
-              </label>
 
               <input
                 type="number"
-                min="0"
-                value={walkMinutes}
+                value={row.walk_minutes}
                 onChange={(e) =>
-                  setWalkMinutes(e.target.value)
+                  updateAccessRow(
+                    index,
+                    "walk_minutes",
+                    e.target.value
+                  )
                 }
-                placeholder="e.g. 5"
+                placeholder="Minutes"
                 style={styles.input}
               />
+
+              {accessRows.length > 1 && (
+                <button
+                  type="button"
+                  onClick={() =>
+                    removeAccessRow(index)
+                  }
+                  style={styles.removeButton}
+                >
+                  ×
+                </button>
+              )}
             </div>
-          </div>
+          ))}
+
+          <button
+            type="button"
+            onClick={addAccessRow}
+            style={styles.addButton}
+          >
+            ＋ Add another station
+          </button>
         </section>
 
         {/* CONTACT */}
 
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>
-            Contact & Website
-          </h2>
+        <section style={styles.card}>
+          <div style={styles.cardHeader}>
+            <span style={styles.icon}>♡</span>
 
-          <div style={styles.grid}>
             <div>
-              <label style={styles.label}>
-                Phone
-              </label>
+              <h2 style={styles.sectionTitle}>
+                Links & Contact
+              </h2>
+            </div>
+          </div>
+
+          <div style={styles.formGrid}>
+            <div>
+              <label style={styles.label}>Phone</label>
 
               <input
                 value={phone}
-                onChange={(e) =>
-                  setPhone(e.target.value)
-                }
+                onChange={(e) => setPhone(e.target.value)}
                 style={styles.input}
               />
             </div>
@@ -636,7 +740,6 @@ export default function NewPlacePage() {
                 onChange={(e) =>
                   setOfficialUrl(e.target.value)
                 }
-                placeholder="https://..."
                 style={styles.input}
               />
             </div>
@@ -651,7 +754,6 @@ export default function NewPlacePage() {
                 onChange={(e) =>
                   setInstagramUrl(e.target.value)
                 }
-                placeholder="https://instagram.com/..."
                 style={styles.input}
               />
             </div>
@@ -666,21 +768,26 @@ export default function NewPlacePage() {
                 onChange={(e) =>
                   setTabelogUrl(e.target.value)
                 }
-                placeholder="https://..."
                 style={styles.input}
               />
             </div>
           </div>
         </section>
 
-        {/* STORE INFORMATION */}
+        {/* DETAILS */}
 
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>
-            Store Information
-          </h2>
+        <section style={styles.card}>
+          <div style={styles.cardHeader}>
+            <span style={styles.icon}>☕</span>
 
-          <div style={styles.grid}>
+            <div>
+              <h2 style={styles.sectionTitle}>
+                Details
+              </h2>
+            </div>
+          </div>
+
+          <div style={styles.formGrid}>
             <div>
               <label style={styles.label}>
                 Price Range
@@ -691,7 +798,7 @@ export default function NewPlacePage() {
                 onChange={(e) =>
                   setPriceRange(e.target.value)
                 }
-                placeholder="e.g. ¥1,000–¥2,000"
+                placeholder="¥1,000–¥2,000"
                 style={styles.input}
               />
             </div>
@@ -706,7 +813,6 @@ export default function NewPlacePage() {
                 onChange={(e) =>
                   setReservation(e.target.value)
                 }
-                placeholder="e.g. Recommended"
                 style={styles.input}
               />
             </div>
@@ -721,7 +827,6 @@ export default function NewPlacePage() {
                 onChange={(e) =>
                   setEnglishSupport(e.target.value)
                 }
-                placeholder="e.g. English menu available"
                 style={styles.input}
               />
             </div>
@@ -736,7 +841,6 @@ export default function NewPlacePage() {
                 onChange={(e) =>
                   setOpeningHours(e.target.value)
                 }
-                placeholder="e.g. 10:00–20:00"
                 style={styles.input}
               />
             </div>
@@ -751,115 +855,41 @@ export default function NewPlacePage() {
                 onChange={(e) =>
                   setClosedDays(e.target.value)
                 }
-                placeholder="e.g. Monday"
                 style={styles.input}
               />
             </div>
-          </div>
-
-          <div style={styles.grid}>
-            <div>
-              <label style={styles.label}>
-                Total Seats
-              </label>
-
-              <input
-                type="number"
-                value={seats}
-                onChange={(e) =>
-                  setSeats(e.target.value)
-                }
-                style={styles.input}
-              />
-            </div>
-
-            <div>
-              <label style={styles.label}>
-                Counter Seats
-              </label>
-
-              <input
-                type="number"
-                value={counterSeats}
-                onChange={(e) =>
-                  setCounterSeats(e.target.value)
-                }
-                style={styles.input}
-              />
-            </div>
-
-            <div>
-              <label style={styles.label}>
-                Table Seats
-              </label>
-
-              <input
-                type="number"
-                value={tableSeats}
-                onChange={(e) =>
-                  setTableSeats(e.target.value)
-                }
-                style={styles.input}
-              />
-            </div>
-          </div>
-
-          <div style={styles.checkboxRow}>
-            <label style={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={card}
-                onChange={(e) =>
-                  setCard(e.target.checked)
-                }
-              />
-              Credit Cards Accepted
-            </label>
-
-            <label style={styles.checkboxLabel}>
-              <input
-                type="checkbox"
-                checked={taxFree}
-                onChange={(e) =>
-                  setTaxFree(e.target.checked)
-                }
-              />
-              Tax Free Available
-            </label>
           </div>
         </section>
 
         {/* IMAGE */}
 
-        <section style={styles.section}>
-          <h2 style={styles.sectionTitle}>
-            Image
-          </h2>
+        <section style={styles.card}>
+          <div style={styles.cardHeader}>
+            <span style={styles.icon}>✧</span>
 
-          <label style={styles.label}>
-            Image URL
-          </label>
+            <div>
+              <h2 style={styles.sectionTitle}>
+                Image
+              </h2>
+            </div>
+          </div>
 
           <input
             value={imageUrl}
             onChange={(e) =>
               setImageUrl(e.target.value)
             }
-            placeholder="https://..."
+            placeholder="Image URL"
             style={styles.input}
           />
         </section>
 
-        {/* STATUS */}
+        {/* PUBLISH */}
 
-        <section style={styles.section}>
+        <section style={styles.card}>
           <h2 style={styles.sectionTitle}>
             Publishing
           </h2>
-
-          <label style={styles.label}>
-            Status
-          </label>
 
           <select
             value={status}
@@ -868,25 +898,18 @@ export default function NewPlacePage() {
             }
             style={styles.input}
           >
-            <option value="draft">
-              Draft
-            </option>
-
+            <option value="draft">Draft</option>
             <option value="published">
               Published
             </option>
-
-            <option value="hidden">
-              Hidden
-            </option>
-
+            <option value="hidden">Hidden</option>
             <option value="archived">
               Archived
             </option>
           </select>
         </section>
 
-        <div style={styles.bottomActions}>
+        <div style={styles.bottom}>
           <Link
             href="/admin/places"
             style={styles.cancelButton}
@@ -895,27 +918,27 @@ export default function NewPlacePage() {
           </Link>
 
           <button
-            type="button"
             onClick={handleSave}
             disabled={saving}
-            style={{
-              ...styles.saveButton,
-              opacity: saving ? 0.6 : 1,
-            }}
+            style={styles.saveButton}
           >
-            {saving ? "Saving..." : "Save Place"}
+            {saving ? "Saving..." : "Save Place ✦"}
           </button>
         </div>
+
       </div>
     </main>
   );
 }
 
+
 const styles = {
   page: {
     minHeight: "100vh",
-    background: "#fafafa",
-    padding: "40px 24px 100px",
+    padding: "40px 20px 100px",
+    background:
+      "linear-gradient(135deg, #fff7fb 0%, #f8f5ff 45%, #fff9f3 100%)",
+    color: "#453b46",
   },
 
   container: {
@@ -923,135 +946,202 @@ const styles = {
     margin: "0 auto",
   },
 
-  top: {
+  loading: {
+    textAlign: "center" as const,
+    padding: "100px 20px",
+    color: "#8d7183",
+  },
+
+  header: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "flex-start",
+    alignItems: "center",
     gap: "20px",
     marginBottom: "30px",
   },
 
   backLink: {
-    color: "#666",
     textDecoration: "none",
+    color: "#a27891",
     fontSize: "14px",
+    fontWeight: 600,
   },
 
   title: {
-    margin: "15px 0 8px",
     fontSize: "34px",
+    margin: "12px 0 6px",
+    letterSpacing: "-1px",
   },
 
   subtitle: {
     margin: 0,
-    color: "#666",
+    color: "#947f8d",
   },
 
-  section: {
-    background: "#fff",
-    border: "1px solid #ddd",
-    borderRadius: "14px",
+  card: {
+    background: "rgba(255,255,255,0.85)",
+    border: "1px solid #f0dfe8",
+    borderRadius: "24px",
     padding: "28px",
     marginBottom: "20px",
+    boxShadow: "0 8px 30px rgba(173,120,150,0.08)",
+  },
+
+  cardHeader: {
+    display: "flex",
+    alignItems: "center",
+    gap: "13px",
+    marginBottom: "22px",
+  },
+
+  icon: {
+    width: "42px",
+    height: "42px",
+    borderRadius: "14px",
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    background: "#fff0f6",
+    fontSize: "20px",
   },
 
   sectionTitle: {
-    margin: "0 0 24px",
-    fontSize: "22px",
+    margin: 0,
+    fontSize: "20px",
   },
 
-  grid: {
+  sectionText: {
+    margin: "4px 0 0",
+    color: "#a28b99",
+    fontSize: "13px",
+  },
+
+  formGrid: {
     display: "grid",
     gridTemplateColumns:
-      "repeat(auto-fit, minmax(220px, 1fr))",
-    gap: "20px",
-    marginBottom: "20px",
+      "repeat(auto-fit, minmax(230px, 1fr))",
+    gap: "18px",
   },
 
-  fullWidth: {
+  full: {
     gridColumn: "1 / -1",
-    marginBottom: "20px",
+    marginTop: "18px",
   },
 
   label: {
     display: "block",
     marginBottom: "8px",
-    fontWeight: 600,
-    fontSize: "14px",
+    fontSize: "13px",
+    fontWeight: 700,
+    color: "#654f5d",
   },
 
   input: {
     width: "100%",
-    height: "46px",
-    padding: "0 13px",
-    border: "1px solid #bbb",
-    borderRadius: "8px",
+    height: "48px",
+    padding: "0 14px",
+    borderRadius: "12px",
+    border: "1px solid #ead9e2",
     background: "#fff",
-    color: "#222",
-    fontSize: "15px",
+    fontSize: "14px",
+    color: "#493d45",
     boxSizing: "border-box" as const,
   },
 
   textarea: {
     width: "100%",
     minHeight: "120px",
-    padding: "13px",
-    border: "1px solid #bbb",
-    borderRadius: "8px",
+    padding: "14px",
+    borderRadius: "14px",
+    border: "1px solid #ead9e2",
     background: "#fff",
-    color: "#222",
-    fontSize: "15px",
+    fontSize: "14px",
     boxSizing: "border-box" as const,
     resize: "vertical" as const,
   },
 
-  checkboxRow: {
-    display: "flex",
-    gap: "30px",
-    flexWrap: "wrap" as const,
-    marginTop: "20px",
-  },
-
-  checkboxLabel: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
+  textareaSmall: {
+    width: "100%",
+    minHeight: "80px",
+    padding: "14px",
+    borderRadius: "14px",
+    border: "1px solid #ead9e2",
+    background: "#fffafc",
     fontSize: "14px",
+    boxSizing: "border-box" as const,
+    resize: "vertical" as const,
   },
 
-  bottomActions: {
+  helper: {
+    margin: "7px 0 0",
+    fontSize: "12px",
+    color: "#b08b9f",
+  },
+
+  accessRow: {
+    display: "grid",
+    gridTemplateColumns: "2fr 1fr 1fr 42px",
+    gap: "10px",
+    alignItems: "center",
+    marginBottom: "10px",
+  },
+
+  addButton: {
+    marginTop: "8px",
+    border: "1px dashed #d8a8c0",
+    background: "#fff6fa",
+    color: "#a56787",
+    padding: "11px 16px",
+    borderRadius: "12px",
+    cursor: "pointer",
+    fontWeight: 600,
+  },
+
+  removeButton: {
+    width: "38px",
+    height: "38px",
+    borderRadius: "50%",
+    border: "none",
+    background: "#fff0f3",
+    color: "#c57b91",
+    cursor: "pointer",
+    fontSize: "20px",
+  },
+
+  saveButton: {
+    border: "none",
+    borderRadius: "14px",
+    padding: "14px 22px",
+    background:
+      "linear-gradient(135deg, #e69ab7, #c69adf)",
+    color: "#fff",
+    fontWeight: 700,
+    cursor: "pointer",
+    boxShadow: "0 6px 18px rgba(198,154,223,0.25)",
+  },
+
+  cancelButton: {
+    padding: "13px 20px",
+    borderRadius: "14px",
+    background: "#fff",
+    border: "1px solid #ead9e2",
+    color: "#806c78",
+    textDecoration: "none",
+  },
+
+  bottom: {
     display: "flex",
     justifyContent: "flex-end",
     gap: "12px",
     marginTop: "30px",
   },
 
-  saveButton: {
-    border: "none",
-    background: "#222",
-    color: "#fff",
-    padding: "13px 22px",
-    borderRadius: "8px",
-    fontSize: "15px",
-    cursor: "pointer",
-  },
-
-  cancelButton: {
-    border: "1px solid #ccc",
-    background: "#fff",
-    color: "#333",
-    padding: "13px 22px",
-    borderRadius: "8px",
-    fontSize: "15px",
-    textDecoration: "none",
-  },
-
   error: {
-    background: "#fff0f0",
-    border: "1px solid #e4aaaa",
-    color: "#a33",
-    padding: "15px",
-    borderRadius: "10px",
     marginBottom: "20px",
+    padding: "16px",
+    borderRadius: "14px",
+    background: "#fff0f2",
+    border: "1px solid #f0b7c1",
+    color: "#a74d60",
   },
 };
