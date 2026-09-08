@@ -1,543 +1,218 @@
 "use client";
 
 import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
-import { useParams } from "next/navigation";
+import { useEffect, useState } from "react";
+import { useParams, useRouter } from "next/navigation";
+import { supabase } from "@/lib/supabase";
 
-import { supabase } from "../../../../lib/supabase";
-import ImageUploader from "../../../../components/ImageUploader";
-
-type FoodStatus = "active" | "hidden" | "archived";
-
-type Category = {
+type FoodCategory = {
   id: number;
   name: string;
-  parent_id: number | null;
-};
-
-type CategoryNode = Category & {
-  children: CategoryNode[];
 };
 
 type Place = {
   id: string;
   name: string;
+};
+
+type Food = {
+  id: string;
+  name: string;
+  category_id: number | null;
+  place_id: string | null;
   description: string | null;
   image_url: string | null;
-  place_type_id: number | null;
-  area_id: number | null;
-  status: string | null;
+  editor_pick: number;
+  status: string;
 };
 
-type PlaceType = {
-  id: number;
-  name: string;
-};
-
-export default function EditFoodPage() {
+export default function FoodDetailPage() {
   const params = useParams();
-  const foodId = String(params.id);
+  const router = useRouter();
 
-  // =====================================
-  // FOOD
-  // =====================================
+  const id = params.id as string;
+
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+
+  const [siteId, setSiteId] = useState("");
+
+  const [categories, setCategories] = useState<FoodCategory[]>([]);
+  const [places, setPlaces] = useState<Place[]>([]);
 
   const [name, setName] = useState("");
+  const [categoryId, setCategoryId] = useState("");
+  const [placeId, setPlaceId] = useState("");
+
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
 
-  const [categoryInput, setCategoryInput] = useState("");
-  const [categoryId, setCategoryId] = useState("");
+  const [editorPick, setEditorPick] = useState(0);
+  const [status, setStatus] = useState("active");
 
-  const [editorPick, setEditorPick] = useState("0");
-
-  const [status, setStatus] =
-    useState<FoodStatus>("active");
-
-  // =====================================
-  // DATA
-  // =====================================
-
-  const [categories, setCategories] =
-    useState<Category[]>([]);
-
-  const [places, setPlaces] =
-    useState<Place[]>([]);
-
-  const [placeTypes, setPlaceTypes] =
-    useState<PlaceType[]>([]);
-
-  // =====================================
-  // FOOD ↔ PLACE
-  // =====================================
-
-  const [selectedPlaceIds, setSelectedPlaceIds] =
-    useState<string[]>([]);
-
-  // =====================================
-  // UI
-  // =====================================
-
-  const [loading, setLoading] =
-    useState(true);
-
-  const [saving, setSaving] =
-    useState(false);
-
-  const [message, setMessage] =
-    useState("");
-
-  const [placeSearch, setPlaceSearch] =
-    useState("");
-
-  // =====================================
-  // LOAD
-  // =====================================
+  const [errorMessage, setErrorMessage] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
 
   useEffect(() => {
-    async function load() {
-      setLoading(true);
-      setMessage("");
-
-      const [
-        foodResult,
-        categoriesResult,
-        placesResult,
-        placeTypesResult,
-        relationsResult,
-      ] = await Promise.all([
-        supabase
-          .from("foods")
-          .select("*")
-          .eq("id", foodId)
-          .single(),
-
-        supabase
-          .from("food_categories")
-          .select("id, name, parent_id")
-          .eq("is_active", true)
-          .order("sort_order")
-          .order("name"),
-
-        supabase
-          .from("places")
-          .select(`
-            id,
-            name,
-            description,
-            image_url,
-            place_type_id,
-            area_id,
-            status
-          `)
-          .in("status", [
-            "draft",
-            "published",
-          ])
-          .order("name"),
-
-        supabase
-          .from("place_types")
-          .select("id, name")
-          .eq("is_active", true)
-          .order("sort_order")
-          .order("name"),
-
-        supabase
-          .from("place_foods")
-          .select("place_id")
-          .eq("food_id", foodId),
-      ]);
-
-      // =====================================
-      // FOOD
-      // =====================================
-
-      if (
-        foodResult.error ||
-        !foodResult.data
-      ) {
-        setMessage(
-          `Foodを読み込めませんでした: ${
-            foodResult.error?.message ??
-            "Unknown error"
-          }`
-        );
-
-        setLoading(false);
-        return;
-      }
-
-      const food = foodResult.data;
-
-      setName(food.name ?? "");
-
-      setDescription(
-        food.description ?? ""
-      );
-
-      setImageUrl(
-        food.image_url ?? ""
-      );
-
-      setEditorPick(
-        String(food.editor_pick ?? 0)
-      );
-
-      if (
-        food.status === "active" ||
-        food.status === "hidden" ||
-        food.status === "archived"
-      ) {
-        setStatus(food.status);
-      } else {
-        setStatus("active");
-      }
-
-      // =====================================
-      // CATEGORIES
-      // =====================================
-
-      const loadedCategories =
-        (categoriesResult.data ?? []) as Category[];
-
-      setCategories(loadedCategories);
-
-      const matchedCategory =
-        loadedCategories.find(
-          (category) =>
-            String(category.id) ===
-            String(food.category_id ?? "")
-        );
-
-      setCategoryId(
-        matchedCategory
-          ? String(matchedCategory.id)
-          : ""
-      );
-
-      setCategoryInput(
-        matchedCategory?.name ?? ""
-      );
-
-      // =====================================
-      // PLACES
-      // =====================================
-
-      setPlaces(
-        (placesResult.data ?? []) as Place[]
-      );
-
-      setPlaceTypes(
-        (placeTypesResult.data ?? []) as PlaceType[]
-      );
-
-      // =====================================
-      // RELATIONS
-      // =====================================
-
-      setSelectedPlaceIds(
-        (relationsResult.data ?? []).map(
-          (row: { place_id: string | number }) =>
-            String(row.place_id)
-        )
-      );
-
-      const errors = [
-        categoriesResult.error,
-        placesResult.error,
-        placeTypesResult.error,
-        relationsResult.error,
-      ].filter(Boolean);
-
-      if (errors.length > 0) {
-        setMessage(
-          `一部データの読み込みに失敗しました: ${
-            errors[0]!.message
-          }`
-        );
-      }
-
-      setLoading(false);
+    if (id) {
+      loadData();
     }
+  }, [id]);
 
-    load();
-  }, [foodId]);
-
-  // =====================================
-  // CATEGORY TREE
-  // =====================================
-
-  const categoryTree = useMemo(() => {
-    const nodes =
-      new Map<number, CategoryNode>();
-
-    categories.forEach((category) => {
-      nodes.set(category.id, {
-        ...category,
-        children: [],
-      });
-    });
-
-    const roots: CategoryNode[] = [];
-
-    categories.forEach((category) => {
-      const node =
-        nodes.get(category.id);
-
-      if (!node) return;
-
-      if (
-        category.parent_id !== null &&
-        nodes.has(category.parent_id)
-      ) {
-        nodes
-          .get(category.parent_id)!
-          .children.push(node);
-      } else {
-        roots.push(node);
-      }
-    });
-
-    return roots;
-  }, [categories]);
-
-  // =====================================
-  // CATEGORY
-  // =====================================
-
-  function handleCategoryChange(
-    value: string
-  ) {
-    setCategoryInput(value);
-
-    const existing =
-      categories.find(
-        (category) =>
-          category.name
-            .trim()
-            .toLowerCase() ===
-          value
-            .trim()
-            .toLowerCase()
-      );
-
-    setCategoryId(
-      existing
-        ? String(existing.id)
-        : ""
-    );
-  }
-
-  function renderCategory(
-    category: CategoryNode,
-    level = 0
-  ): React.ReactNode {
-    return (
-      <div key={category.id}>
-        <label
-          style={{
-            ...styles.categoryOption,
-            marginLeft: `${level * 20}px`,
-          }}
-        >
-          <input
-            type="radio"
-            name="food-category"
-            checked={
-              categoryId ===
-              String(category.id)
-            }
-            onChange={() => {
-              setCategoryId(
-                String(category.id)
-              );
-
-              setCategoryInput(
-                category.name
-              );
-            }}
-          />
-
-          {category.name}
-        </label>
-
-        {category.children.map((child) =>
-          renderCategory(
-            child,
-            level + 1
-          )
-        )}
-      </div>
-    );
-  }
-
-  // =====================================
-  // PLACE SEARCH
-  // =====================================
-
-  const filteredPlaces = useMemo(() => {
-    const keyword =
-      placeSearch.trim().toLowerCase();
-
-    if (!keyword) {
-      return places;
-    }
-
-    return places.filter((place) => {
-      const type =
-        placeTypes.find(
-          (item) =>
-            item.id === place.place_type_id
-        );
-
-      return (
-        place.name
-          .toLowerCase()
-          .includes(keyword) ||
-        type?.name
-          .toLowerCase()
-          .includes(keyword)
-      );
-    });
-  }, [
-    places,
-    placeTypes,
-    placeSearch,
-  ]);
-
-  // =====================================
-  // PLACE TOGGLE
-  // =====================================
-
-  function togglePlace(
-    placeId: string
-  ) {
-    setSelectedPlaceIds((current) =>
-      current.includes(placeId)
-        ? current.filter(
-            (id) => id !== placeId
-          )
-        : [...current, placeId]
-    );
-  }
-
-  // =====================================
-  // SAVE
-  // =====================================
-
-  async function handleSave(
-    e: React.FormEvent<HTMLFormElement>
-  ) {
-    e.preventDefault();
-
-    if (!name.trim()) {
-      setMessage(
-        "Food nameを入力してください。"
-      );
-      return;
-    }
-
-    setSaving(true);
-    setMessage("保存中...");
+  async function loadData() {
+    setLoading(true);
+    setErrorMessage("");
 
     try {
-      // =====================================
+      // ----------------------------------------
       // SITE
-      // =====================================
+      // ----------------------------------------
 
-      const {
-        data: site,
-        error: siteError,
-      } = await supabase
+      const { data: site, error: siteError } = await supabase
         .from("sites")
         .select("id")
         .eq("slug", "tokyo-guide")
         .single();
 
-      if (
-        siteError ||
-        !site
-      ) {
+      if (siteError || !site) {
         throw new Error(
-          `サイト情報を取得できませんでした: ${
-            siteError?.message ??
-            "Unknown error"
-          }`
+          siteError?.message ||
+            "TOKYO GUIDE site could not be found."
         );
       }
 
-      // =====================================
-      // CATEGORY
-      // =====================================
+      setSiteId(site.id);
 
-      let resolvedCategoryId:
-        | number
-        | null = null;
+      // ----------------------------------------
+      // FOOD
+      // ----------------------------------------
 
-      const trimmedCategory =
-        categoryInput.trim();
+      const { data: foodData, error: foodError } =
+        await supabase
+          .from("foods")
+          .select(`
+            id,
+            name,
+            category_id,
+            place_id,
+            description,
+            image_url,
+            editor_pick,
+            status
+          `)
+          .eq("id", id)
+          .single();
 
-      if (trimmedCategory) {
-        const existing =
-          categories.find(
-            (category) =>
-              category.name
-                .trim()
-                .toLowerCase() ===
-              trimmedCategory.toLowerCase()
-          );
-
-        if (existing) {
-          resolvedCategoryId =
-            existing.id;
-        } else {
-          const {
-            data: newCategory,
-            error: categoryError,
-          } = await supabase
-            .from("food_categories")
-            .insert({
-              site_id: site.id,
-              name: trimmedCategory,
-              parent_id: null,
-              sort_order: 0,
-              is_active: true,
-            })
-            .select("id")
-            .single();
-
-          if (
-            categoryError ||
-            !newCategory
-          ) {
-            throw new Error(
-              `カテゴリの作成に失敗しました: ${
-                categoryError?.message ??
-                "Unknown error"
-              }`
-            );
-          }
-
-          resolvedCategoryId =
-            newCategory.id;
-        }
+      if (foodError || !foodData) {
+        throw new Error(
+          foodError?.message ||
+            "Food could not be found."
+        );
       }
 
-      // =====================================
-      // FOOD
-      // =====================================
+      const food = foodData as Food;
 
-      const {
-        error: foodError,
-      } = await supabase
+      setName(food.name ?? "");
+      setCategoryId(
+        food.category_id
+          ? String(food.category_id)
+          : ""
+      );
+      setPlaceId(food.place_id ?? "");
+      setDescription(food.description ?? "");
+      setImageUrl(food.image_url ?? "");
+      setEditorPick(food.editor_pick ?? 0);
+      setStatus(food.status ?? "active");
+
+      // ----------------------------------------
+      // CATEGORIES
+      // ----------------------------------------
+
+      const { data: categoriesData, error: categoriesError } =
+        await supabase
+          .from("food_categories")
+          .select("id, name")
+          .eq("site_id", site.id)
+          .eq("is_active", true)
+          .order("sort_order", {
+            ascending: true,
+          });
+
+      if (categoriesError) {
+        throw new Error(categoriesError.message);
+      }
+
+      setCategories(categoriesData ?? []);
+
+      // ----------------------------------------
+      // PLACES
+      // ----------------------------------------
+
+      const { data: placesData, error: placesError } =
+        await supabase
+          .from("places")
+          .select("id, name")
+          .eq("site_id", site.id)
+          .order("name", {
+            ascending: true,
+          });
+
+      if (placesError) {
+        throw new Error(placesError.message);
+      }
+
+      setPlaces(placesData ?? []);
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to load food."
+      );
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  async function handleSave() {
+    setErrorMessage("");
+    setSuccessMessage("");
+
+    if (!name.trim()) {
+      setErrorMessage("Please enter a food name.");
+      return;
+    }
+
+    if (!siteId) {
+      setErrorMessage(
+        "Site information could not be loaded."
+      );
+      return;
+    }
+
+    setSaving(true);
+
+    try {
+      // ==================================================
+      // IMPORTANT
+      //
+      // Food → Place relationship is saved directly here:
+      //
+      // foods.place_id → places.id
+      //
+      // place_foods is NOT used.
+      // ==================================================
+
+      const { error } = await supabase
         .from("foods")
         .update({
-          category_id:
-            resolvedCategoryId,
+          name: name.trim(),
 
-          name:
-            name.trim(),
+          category_id: categoryId
+            ? Number(categoryId)
+            : null,
+
+          place_id: placeId || null,
 
           description:
             description.trim() || null,
@@ -545,669 +220,612 @@ export default function EditFoodPage() {
           image_url:
             imageUrl.trim() || null,
 
-          editor_pick:
-            Number(editorPick),
+          editor_pick: editorPick,
 
           status,
+
+          updated_at: new Date().toISOString(),
         })
-        .eq("id", foodId);
+        .eq("id", id);
 
-      if (foodError) {
-        throw new Error(
-          `Foodの更新に失敗しました: ${foodError.message}`
-        );
+      if (error) {
+        throw new Error(error.message);
       }
 
-      // =====================================
-      // FOOD ↔ PLACE
-      // =====================================
-
-      const {
-        error: deleteError,
-      } = await supabase
-        .from("place_foods")
-        .delete()
-        .eq("food_id", foodId);
-
-      if (deleteError) {
-        throw new Error(
-          `店舗紐付けの更新に失敗しました: ${deleteError.message}`
-        );
-      }
-
-      if (
-        selectedPlaceIds.length > 0
-      ) {
-        const rows =
-          selectedPlaceIds.map(
-            (placeId) => ({
-              food_id: foodId,
-              place_id: placeId,
-            })
-          );
-
-        const {
-          error: relationError,
-        } = await supabase
-          .from("place_foods")
-          .insert(rows);
-
-        if (relationError) {
-          throw new Error(
-            `店舗の紐付けに失敗しました: ${relationError.message}`
-          );
-        }
-      }
-
-      setMessage(
-        "Foodを保存しました。"
+      setSuccessMessage(
+        "Food updated successfully."
       );
+
+      router.refresh();
     } catch (error) {
-      setMessage(
+      setErrorMessage(
         error instanceof Error
           ? error.message
-          : "保存に失敗しました。"
+          : "Failed to update food."
       );
     } finally {
       setSaving(false);
     }
   }
 
-  // =====================================
-  // LOADING
-  // =====================================
+  async function handleDelete() {
+    const confirmed = window.confirm(
+      "Delete this food permanently?"
+    );
+
+    if (!confirmed) {
+      return;
+    }
+
+    setDeleting(true);
+    setErrorMessage("");
+
+    try {
+      const { error } = await supabase
+        .from("foods")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      router.push("/admin/food");
+      router.refresh();
+    } catch (error) {
+      setErrorMessage(
+        error instanceof Error
+          ? error.message
+          : "Failed to delete food."
+      );
+
+      setDeleting(false);
+    }
+  }
 
   if (loading) {
     return (
-      <main style={styles.loadingPage}>
-        読み込み中...
+      <main style={styles.page}>
+        <div style={styles.loading}>
+          Loading...
+        </div>
       </main>
     );
   }
 
   return (
-    <main style={styles.main}>
+    <main style={styles.page}>
       <div style={styles.container}>
+        <div style={styles.topBar}>
+          <div>
+            <Link
+              href="/admin/food"
+              style={styles.backLink}
+            >
+              ← Food Database
+            </Link>
 
-        <div style={styles.topbar}>
-          <Link
-            href="/admin/food"
-            style={styles.back}
-          >
-            ← Foods
-          </Link>
+            <p style={styles.eyebrow}>
+              TOKYO GUIDE ADMIN
+            </p>
 
-          <Link
-            href={`/food/${foodId}`}
-            target="_blank"
-            rel="noopener noreferrer"
-            style={styles.preview}
+            <h1 style={styles.title}>
+              Edit Food ✦
+            </h1>
+
+            <p style={styles.subtitle}>
+              Edit food information and its linked place.
+            </p>
+          </div>
+
+          <button
+            onClick={handleSave}
+            disabled={saving}
+            style={styles.saveButton}
           >
-            Preview ↗
-          </Link>
+            {saving
+              ? "Saving..."
+              : "Save Changes ✦"}
+          </button>
         </div>
 
-        <header style={styles.header}>
-          <p style={styles.eyebrow}>
-            CONTENT / FOODS
-          </p>
+        {errorMessage && (
+          <div style={styles.errorMessage}>
+            {errorMessage}
+          </div>
+        )}
 
-          <h1 style={styles.title}>
-            Edit Food
-          </h1>
+        {successMessage && (
+          <div style={styles.successMessage}>
+            {successMessage}
+          </div>
+        )}
 
-          <p style={styles.description}>
-            食べ物そのものを登録します。
-            店舗情報はPlaceで管理し、
-            このFoodを提供しているPlaceだけを紐付けます。
-          </p>
-        </header>
+        <div style={styles.card}>
+          {/* ============================================ */}
+          {/* BASIC INFORMATION */}
+          {/* ============================================ */}
 
-        <form
-          onSubmit={handleSave}
-          style={styles.form}
-        >
-
-          {/* =====================================
-              FOOD
-          ===================================== */}
-
-          <section style={styles.section}>
-
+          <div style={styles.section}>
             <h2 style={styles.sectionTitle}>
-              Food
+              Basic Information
+            </h2>
+
+            <div style={styles.grid}>
+              <div style={styles.fullField}>
+                <label style={styles.label}>
+                  Food Name *
+                </label>
+
+                <input
+                  value={name}
+                  onChange={(e) =>
+                    setName(e.target.value)
+                  }
+                  placeholder="e.g. Strawberry Kakigori"
+                  style={styles.input}
+                />
+              </div>
+
+              <div style={styles.field}>
+                <label style={styles.label}>
+                  Category
+                </label>
+
+                <select
+                  value={categoryId}
+                  onChange={(e) =>
+                    setCategoryId(e.target.value)
+                  }
+                  style={styles.select}
+                >
+                  <option value="">
+                    Select category
+                  </option>
+
+                  {categories.map((category) => (
+                    <option
+                      key={category.id}
+                      value={category.id}
+                    >
+                      {category.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div style={styles.field}>
+                <label style={styles.label}>
+                  Place
+                </label>
+
+                <select
+                  value={placeId}
+                  onChange={(e) =>
+                    setPlaceId(e.target.value)
+                  }
+                  style={styles.select}
+                >
+                  <option value="">
+                    No place selected
+                  </option>
+
+                  {places.map((place) => (
+                    <option
+                      key={place.id}
+                      value={place.id}
+                    >
+                      {place.name}
+                    </option>
+                  ))}
+                </select>
+
+                <p style={styles.help}>
+                  This food is linked directly to one registered place.
+                </p>
+              </div>
+            </div>
+          </div>
+
+          <div style={styles.divider} />
+
+          {/* ============================================ */}
+          {/* DESCRIPTION */}
+          {/* ============================================ */}
+
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle}>
+              Description
             </h2>
 
             <label style={styles.label}>
-              Food name *
-
-              <input
-                style={styles.input}
-                value={name}
-                onChange={(e) =>
-                  setName(e.target.value)
-                }
-                required
-              />
-            </label>
-
-            <label style={styles.label}>
-              Category
-
-              <input
-                style={styles.input}
-                list="food-category-options"
-                value={categoryInput}
-                onChange={(e) =>
-                  handleCategoryChange(
-                    e.target.value
-                  )
-                }
-                placeholder="Dessert"
-              />
-
-              <datalist
-                id="food-category-options"
-              >
-                {categories.map(
-                  (category) => (
-                    <option
-                      key={category.id}
-                      value={category.name}
-                    />
-                  )
-                )}
-              </datalist>
-
-              <div
-                style={styles.categoryTree}
-              >
-                {categoryTree.map(
-                  (category) =>
-                    renderCategory(category)
-                )}
-              </div>
-            </label>
-
-            <label style={styles.label}>
               Description
-
-              <textarea
-                style={styles.textarea}
-                value={description}
-                onChange={(e) =>
-                  setDescription(
-                    e.target.value
-                  )
-                }
-              />
             </label>
 
-            <ImageUploader
-              value={imageUrl}
-              onChange={setImageUrl}
-              folder="foods"
-              label="Food Image"
+            <textarea
+              value={description}
+              onChange={(e) =>
+                setDescription(e.target.value)
+              }
+              placeholder="Tell visitors what makes this food special..."
+              style={styles.textarea}
             />
+          </div>
 
-          </section>
+          <div style={styles.divider} />
 
-          {/* =====================================
-              AVAILABLE AT
-          ===================================== */}
+          {/* ============================================ */}
+          {/* IMAGE */}
+          {/* ============================================ */}
 
-          <section style={styles.section}>
+          <div style={styles.section}>
+            <h2 style={styles.sectionTitle}>
+              Image
+            </h2>
 
-            <div style={styles.sectionHeader}>
-
-              <div>
-                <h2
-                  style={styles.sectionTitle}
-                >
-                  Available at
-                </h2>
-
-                <p style={styles.helper}>
-                  このFoodを提供している既存のPlaceを選択します。
-                  Placeの新規登録はPlace管理ページで行います。
-                </p>
-              </div>
-
-              <Link
-                href="/admin/place"
-                style={styles.placeLink}
-              >
-                Manage Places →
-              </Link>
-
-            </div>
+            <label style={styles.label}>
+              Image URL
+            </label>
 
             <input
-              style={styles.input}
-              value={placeSearch}
+              value={imageUrl}
               onChange={(e) =>
-                setPlaceSearch(
-                  e.target.value
-                )
+                setImageUrl(e.target.value)
               }
-              placeholder="Search places..."
+              placeholder="https://..."
+              style={styles.input}
             />
 
-            <div style={styles.placeList}>
+            {imageUrl && (
+              <div style={styles.imagePreview}>
+                <img
+                  src={imageUrl}
+                  alt={name || "Food preview"}
+                  style={styles.image}
+                />
+              </div>
+            )}
+          </div>
 
-              {filteredPlaces.length === 0 ? (
+          <div style={styles.divider} />
 
-                <p style={styles.muted}>
-                  Placeが見つかりません。
-                </p>
+          {/* ============================================ */}
+          {/* PUBLISHING */}
+          {/* ============================================ */}
 
-              ) : (
-
-                filteredPlaces.map(
-                  (place) => {
-
-                    const type =
-                      placeTypes.find(
-                        (item) =>
-                          item.id ===
-                          place.place_type_id
-                      );
-
-                    return (
-
-                      <label
-                        key={place.id}
-                        style={styles.placeOption}
-                      >
-
-                        <input
-                          type="checkbox"
-                          checked={
-                            selectedPlaceIds.includes(
-                              place.id
-                            )
-                          }
-                          onChange={() =>
-                            togglePlace(
-                              place.id
-                            )
-                          }
-                        />
-
-                        {place.image_url && (
-
-                          <img
-                            src={place.image_url}
-                            alt={place.name}
-                            style={
-                              styles.placeImage
-                            }
-                          />
-
-                        )}
-
-                        <span
-                          style={styles.placeInfo}
-                        >
-
-                          <strong>
-                            {place.name}
-                          </strong>
-
-                          {type && (
-
-                            <span
-                              style={
-                                styles.placeMeta
-                              }
-                            >
-                              {type.name}
-                            </span>
-
-                          )}
-
-                        </span>
-
-                      </label>
-
-                    );
-                  }
-                )
-
-              )}
-
-            </div>
-
-          </section>
-
-          {/* =====================================
-              PUBLISHING
-          ===================================== */}
-
-          <section style={styles.section}>
-
+          <div style={styles.section}>
             <h2 style={styles.sectionTitle}>
               Publishing
             </h2>
 
-            <label style={styles.label}>
-              Editor's Pick
+            <div style={styles.grid}>
+              <div style={styles.field}>
+                <label style={styles.label}>
+                  Editor Pick
+                </label>
 
-              <select
-                style={styles.input}
-                value={editorPick}
-                onChange={(e) =>
-                  setEditorPick(
-                    e.target.value
-                  )
-                }
-              >
-                <option value="0">
-                  ☆☆☆☆☆
-                </option>
-                <option value="1">
-                  ★☆☆☆☆
-                </option>
-                <option value="2">
-                  ★★☆☆☆
-                </option>
-                <option value="3">
-                  ★★★☆☆
-                </option>
-                <option value="4">
-                  ★★★★☆
-                </option>
-                <option value="5">
-                  ★★★★★
-                </option>
-              </select>
-            </label>
+                <select
+                  value={editorPick}
+                  onChange={(e) =>
+                    setEditorPick(
+                      Number(e.target.value)
+                    )
+                  }
+                  style={styles.select}
+                >
+                  <option value={0}>
+                    Not selected
+                  </option>
 
-            <label style={styles.label}>
-              Status
+                  <option value={1}>★</option>
+                  <option value={2}>★★</option>
+                  <option value={3}>★★★</option>
+                  <option value={4}>★★★★</option>
+                  <option value={5}>★★★★★</option>
+                </select>
+              </div>
 
-              <select
-                style={styles.input}
-                value={status}
-                onChange={(e) =>
-                  setStatus(
-                    e.target.value as FoodStatus
-                  )
-                }
-              >
-                <option value="active">
-                  Active
-                </option>
+              <div style={styles.field}>
+                <label style={styles.label}>
+                  Status
+                </label>
 
-                <option value="hidden">
-                  Hidden
-                </option>
+                <select
+                  value={status}
+                  onChange={(e) =>
+                    setStatus(e.target.value)
+                  }
+                  style={styles.select}
+                >
+                  <option value="active">
+                    Active
+                  </option>
 
-                <option value="archived">
-                  Archived
-                </option>
-              </select>
-            </label>
+                  <option value="hidden">
+                    Hidden
+                  </option>
 
-          </section>
-
-          {/* =====================================
-              SAVE
-          ===================================== */}
-
-          <div style={styles.bottomBar}>
-
-            <button
-              type="submit"
-              disabled={saving}
-              style={{
-                ...styles.saveButton,
-                opacity:
-                  saving ? 0.6 : 1,
-              }}
-            >
-              {saving
-                ? "Saving..."
-                : "Save Changes"}
-            </button>
-
-            {message && (
-
-              <span style={styles.message}>
-                {message}
-              </span>
-
-            )}
-
+                  <option value="archived">
+                    Archived
+                  </option>
+                </select>
+              </div>
+            </div>
           </div>
 
-        </form>
+          {/* ============================================ */}
+          {/* ACTIONS */}
+          {/* ============================================ */}
+
+          <div style={styles.bottom}>
+            <button
+              onClick={handleDelete}
+              disabled={deleting || saving}
+              style={styles.deleteButton}
+            >
+              {deleting
+                ? "Deleting..."
+                : "Delete Food"}
+            </button>
+
+            <div style={styles.bottomRight}>
+              <Link
+                href="/admin/food"
+                style={styles.cancelButton}
+              >
+                Cancel
+              </Link>
+
+              <button
+                onClick={handleSave}
+                disabled={saving || deleting}
+                style={styles.saveButton}
+              >
+                {saving
+                  ? "Saving..."
+                  : "Save Changes ✦"}
+              </button>
+            </div>
+          </div>
+        </div>
       </div>
     </main>
   );
 }
 
-const styles = {
-
-  main: {
+const styles: Record<
+  string,
+  React.CSSProperties
+> = {
+  page: {
     minHeight: "100vh",
-    background: "#faf8f6",
-    color: "#222",
-    padding: "35px 24px 100px",
-  },
-
-  loadingPage: {
-    minHeight: "100vh",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    background: "#faf8f6",
-    color: "#888",
+    padding: "40px 24px 100px",
+    background:
+      "linear-gradient(135deg, #fff8fb 0%, #f8f5ff 50%, #fffaf5 100%)",
+    color: "#463c46",
   },
 
   container: {
-    maxWidth: "900px",
+    maxWidth: "1000px",
     margin: "0 auto",
   },
 
-  topbar: {
+  loading: {
+    padding: "120px 20px",
+    textAlign: "center",
+    color: "#967c8d",
+  },
+
+  topBar: {
     display: "flex",
     justifyContent: "space-between",
-    alignItems: "center",
+    alignItems: "flex-end",
+    gap: "24px",
+    marginBottom: "28px",
   },
 
-  back: {
-    color: "#777",
+  backLink: {
+    display: "inline-block",
+    marginBottom: "22px",
     textDecoration: "none",
-    fontSize: "13px",
-  },
-
-  preview: {
-    color: "#777",
-    textDecoration: "none",
-    fontSize: "12px",
-  },
-
-  header: {
-    padding: "35px 0 28px",
+    color: "#a06c86",
+    fontSize: "14px",
+    fontWeight: 700,
   },
 
   eyebrow: {
-    color: "#c8647b",
-    fontSize: "10px",
-    fontWeight: 700,
-    letterSpacing: "3px",
-    marginBottom: "8px",
+    margin: "0 0 8px",
+    color: "#b2819c",
+    fontSize: "11px",
+    fontWeight: 800,
+    letterSpacing: "0.14em",
   },
 
   title: {
-    fontFamily: "Georgia, serif",
-    fontSize: "48px",
-    fontWeight: 400,
     margin: 0,
+    fontSize: "38px",
+    letterSpacing: "-1.5px",
   },
 
-  description: {
-    color: "#777",
-    lineHeight: 1.7,
-    marginTop: "10px",
+  subtitle: {
+    margin: "10px 0 0",
+    color: "#9a8491",
+    fontSize: "14px",
   },
 
-  form: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "18px",
+  card: {
+    background: "rgba(255,255,255,0.9)",
+    border: "1px solid #eedfe7",
+    borderRadius: "24px",
+    padding: "32px",
+    boxShadow:
+      "0 12px 40px rgba(169,119,145,0.08)",
   },
 
   section: {
-    background: "#fff",
-    border: "1px solid #e7e0dc",
-    borderRadius: "15px",
-    padding: "22px",
-  },
-
-  sectionHeader: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-start",
-    gap: "15px",
-    marginBottom: "18px",
+    padding: "4px 0",
   },
 
   sectionTitle: {
-    fontFamily: "Georgia, serif",
-    fontSize: "24px",
-    fontWeight: 400,
-    margin: "0 0 10px",
+    margin: "0 0 24px",
+    fontSize: "20px",
+  },
+
+  grid: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(auto-fit, minmax(260px, 1fr))",
+    gap: "20px",
+  },
+
+  field: {
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
+  },
+
+  fullField: {
+    gridColumn: "1 / -1",
+    display: "flex",
+    flexDirection: "column",
+    gap: "8px",
   },
 
   label: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "7px",
     fontSize: "13px",
-    fontWeight: 600,
-    marginBottom: "16px",
+    fontWeight: 800,
+    color: "#705c68",
   },
 
   input: {
     width: "100%",
-    boxSizing: "border-box" as const,
-    padding: "12px 13px",
-    border: "1px solid #ded7d3",
-    borderRadius: "9px",
+    height: "48px",
+    padding: "0 14px",
+    borderRadius: "12px",
+    border: "1px solid #eadce5",
     background: "#fff",
+    outline: "none",
+    boxSizing: "border-box",
+    fontSize: "14px",
+  },
+
+  select: {
+    width: "100%",
+    height: "48px",
+    padding: "0 14px",
+    borderRadius: "12px",
+    border: "1px solid #eadce5",
+    background: "#fff",
+    outline: "none",
     fontSize: "14px",
   },
 
   textarea: {
     width: "100%",
-    minHeight: "120px",
-    boxSizing: "border-box" as const,
-    padding: "12px 13px",
-    border: "1px solid #ded7d3",
-    borderRadius: "9px",
+    minHeight: "140px",
+    padding: "14px",
+    borderRadius: "12px",
+    border: "1px solid #eadce5",
     background: "#fff",
+    outline: "none",
+    boxSizing: "border-box",
+    resize: "vertical",
     fontSize: "14px",
-    resize: "vertical" as const,
+    fontFamily: "inherit",
   },
 
-  categoryTree: {
-    border: "1px solid #eee8e4",
-    borderRadius: "9px",
-    padding: "10px 13px",
-    maxHeight: "260px",
-    overflowY: "auto" as const,
-    marginTop: "5px",
-  },
-
-  categoryOption: {
-    display: "flex",
-    alignItems: "center",
-    gap: "8px",
-    padding: "7px 0",
-    fontSize: "13px",
-    fontWeight: 400,
-  },
-
-  helper: {
-    color: "#888",
-    fontSize: "12px",
-    lineHeight: 1.6,
+  help: {
     margin: 0,
-  },
-
-  placeLink: {
-    border: "1px solid #ddd5d1",
-    borderRadius: "9px",
-    padding: "10px 13px",
-    color: "#555",
-    textDecoration: "none",
-    fontSize: "12px",
-    whiteSpace: "nowrap" as const,
-  },
-
-  placeList: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "8px",
-    marginTop: "14px",
-  },
-
-  placeOption: {
-    display: "flex",
-    alignItems: "center",
-    gap: "13px",
-    border: "1px solid #e7e0dc",
-    borderRadius: "10px",
-    padding: "10px 13px",
-    cursor: "pointer",
-  },
-
-  placeImage: {
-    width: "48px",
-    height: "48px",
-    borderRadius: "8px",
-    objectFit: "cover" as const,
-  },
-
-  placeInfo: {
-    display: "flex",
-    flexDirection: "column" as const,
-    gap: "4px",
-    fontSize: "13px",
-  },
-
-  placeMeta: {
-    color: "#999",
+    color: "#aa929f",
     fontSize: "11px",
-    fontWeight: 400,
+    lineHeight: 1.5,
   },
 
-  muted: {
-    color: "#888",
-    fontSize: "13px",
+  divider: {
+    height: "1px",
+    background: "#f1e6eb",
+    margin: "32px 0",
   },
 
-  bottomBar: {
+  imagePreview: {
+    marginTop: "18px",
+    borderRadius: "16px",
+    overflow: "hidden",
+    maxWidth: "420px",
+    border: "1px solid #eedfe7",
+  },
+
+  image: {
+    width: "100%",
+    display: "block",
+    maxHeight: "320px",
+    objectFit: "cover",
+  },
+
+  bottom: {
+    marginTop: "38px",
+    paddingTop: "24px",
+    borderTop: "1px solid #f1e6eb",
+    display: "flex",
+    justifyContent: "space-between",
+    alignItems: "center",
+    gap: "20px",
+  },
+
+  bottomRight: {
     display: "flex",
     alignItems: "center",
-    gap: "18px",
+    gap: "12px",
+  },
+
+  cancelButton: {
+    textDecoration: "none",
+    color: "#927987",
+    fontSize: "14px",
+    fontWeight: 700,
+    padding: "14px 18px",
   },
 
   saveButton: {
-    border: 0,
-    borderRadius: "10px",
-    background: "#222",
+    border: "none",
+    padding: "14px 22px",
+    borderRadius: "14px",
+    background:
+      "linear-gradient(135deg, #e99bb9, #c69ae1)",
     color: "#fff",
-    padding: "15px 22px",
-    fontSize: "14px",
+    fontWeight: 800,
     cursor: "pointer",
+    fontSize: "14px",
+    boxShadow:
+      "0 8px 20px rgba(202,143,177,0.25)",
   },
 
-  message: {
-    color: "#c8647b",
+  deleteButton: {
+    border: "1px solid #f0c9d0",
+    padding: "13px 18px",
+    borderRadius: "14px",
+    background: "#fff5f6",
+    color: "#bd6172",
+    fontWeight: 800,
+    cursor: "pointer",
     fontSize: "13px",
   },
 
+  errorMessage: {
+    marginBottom: "20px",
+    padding: "15px 18px",
+    borderRadius: "14px",
+    background: "#fff0f2",
+    border: "1px solid #f2c3cc",
+    color: "#ad5367",
+  },
+
+  successMessage: {
+    marginBottom: "20px",
+    padding: "15px 18px",
+    borderRadius: "14px",
+    background: "#f2fff7",
+    border: "1px solid #c9ead7",
+    color: "#4f9670",
+  },
 };
