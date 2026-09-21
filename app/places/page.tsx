@@ -5,7 +5,6 @@ import { useEffect, useMemo, useState } from "react";
 import PlaceCard from "@/components/PlaceCard";
 import { supabase } from "@/lib/supabase";
 
-
 type Region = {
   id: number;
   name: string;
@@ -31,7 +30,6 @@ type Place = {
   area_id: number | null;
   status: string;
   editor_note: string | null;
-  sort_order: number | null;
   created_at: string | null;
 };
 
@@ -54,45 +52,22 @@ type PlaceWithMeta = Place & {
   imageUrl: string | null;
 };
 
-type SortOption =
-  | "recommended"
-  | "newest"
-  | "az";
+type SortOption = "recommended" | "newest" | "az";
 
 export default function PlacesPage() {
-  const [places, setPlaces] = useState<
-    PlaceWithMeta[]
-  >([]);
+  const [places, setPlaces] = useState<PlaceWithMeta[]>([]);
+  const [regions, setRegions] = useState<Region[]>([]);
+  const [areas, setAreas] = useState<Area[]>([]);
+  const [categories, setCategories] = useState<Category[]>([]);
 
-  const [regions, setRegions] = useState<
-    Region[]
-  >([]);
-
-  const [areas, setAreas] = useState<
-    Area[]
-  >([]);
-
-  const [categories, setCategories] = useState<
-    Category[]
-  >([]);
-
-  const [regionId, setRegionId] =
-    useState("");
-
-  const [areaId, setAreaId] =
-    useState("");
-
-  const [categoryId, setCategoryId] =
-    useState("");
-
+  const [regionId, setRegionId] = useState("");
+  const [areaId, setAreaId] = useState("");
+  const [categoryId, setCategoryId] = useState("");
   const [sortBy, setSortBy] =
     useState<SortOption>("recommended");
 
-  const [loading, setLoading] =
-    useState(true);
-
-  const [errorMessage, setErrorMessage] =
-    useState("");
+  const [loading, setLoading] = useState(true);
+  const [errorMessage, setErrorMessage] = useState("");
 
   useEffect(() => {
     async function load() {
@@ -117,13 +92,9 @@ export default function PlacesPage() {
             area_id,
             status,
             editor_note,
-            sort_order,
             created_at
           `)
           .eq("status", "published")
-          .order("sort_order", {
-            ascending: true,
-          })
           .order("created_at", {
             ascending: false,
           }),
@@ -158,9 +129,7 @@ export default function PlacesPage() {
           .order("name"),
 
         supabase
-          .from(
-            "place_category_relations"
-          )
+          .from("place_category_relations")
           .select(`
             place_id,
             category_id
@@ -185,10 +154,7 @@ export default function PlacesPage() {
         imagesResult.error;
 
       if (firstError) {
-        setErrorMessage(
-          firstError.message
-        );
-
+        setErrorMessage(firstError.message);
         setLoading(false);
         return;
       }
@@ -203,81 +169,52 @@ export default function PlacesPage() {
         (areasResult.data ?? []) as Area[];
 
       const loadedCategories =
-        (categoriesResult.data ??
-          []) as Category[];
+        (categoriesResult.data ?? []) as Category[];
 
       const relations =
-        (relationsResult.data ??
-          []) as PlaceCategoryRelation[];
+        (relationsResult.data ?? []) as PlaceCategoryRelation[];
 
       const images =
-        (imagesResult.data ??
-          []) as PlaceImage[];
+        (imagesResult.data ?? []) as PlaceImage[];
 
-      const regionMap =
-        new Map<number, string>();
+      const regionMap = new Map<number, string>();
 
-      loadedRegions.forEach(
-        (region) => {
-          regionMap.set(
-            region.id,
-            region.name
-          );
-        }
-      );
-
-      const areaMap =
-        new Map<number, string>();
-
-      loadedAreas.forEach((area) => {
-        areaMap.set(
-          area.id,
-          area.name
-        );
+      loadedRegions.forEach((region) => {
+        regionMap.set(region.id, region.name);
       });
 
-      const categoryMap =
-        new Map<number, string>();
+      const areaMap = new Map<number, string>();
 
-      loadedCategories.forEach(
-        (category) => {
-          categoryMap.set(
-            category.id,
-            category.name
-          );
-        }
-      );
+      loadedAreas.forEach((area) => {
+        areaMap.set(area.id, area.name);
+      });
+
+      const categoryMap = new Map<number, string>();
+
+      loadedCategories.forEach((category) => {
+        categoryMap.set(category.id, category.name);
+      });
 
       const placeCategoryMap =
         new Map<string, number[]>();
 
-      relations.forEach(
-        (relation) => {
-          const current =
-            placeCategoryMap.get(
-              relation.place_id
-            ) ?? [];
+      relations.forEach((relation) => {
+        const current =
+          placeCategoryMap.get(relation.place_id) ?? [];
 
-          current.push(
-            relation.category_id
-          );
+        current.push(relation.category_id);
 
-          placeCategoryMap.set(
-            relation.place_id,
-            current
-          );
-        }
-      );
+        placeCategoryMap.set(
+          relation.place_id,
+          current
+        );
+      });
 
       const primaryImageMap =
         new Map<string, string>();
 
       images.forEach((image) => {
-        if (
-          !primaryImageMap.has(
-            image.place_id
-          )
-        ) {
+        if (!primaryImageMap.has(image.place_id)) {
           primaryImageMap.set(
             image.place_id,
             image.image_url
@@ -285,56 +222,44 @@ export default function PlacesPage() {
         }
       });
 
-      const result =
-        loadedPlaces.map(
-          (place): PlaceWithMeta => {
-            const categoryIds =
-              placeCategoryMap.get(
-                place.id
-              ) ?? [];
+      const result = loadedPlaces.map(
+        (place): PlaceWithMeta => {
+          const categoryIds =
+            placeCategoryMap.get(place.id) ?? [];
 
-            const firstCategoryId =
-              categoryIds[0];
+          const firstCategoryId =
+            categoryIds[0];
 
-            return {
-              ...place,
+          return {
+            ...place,
 
-              regionName:
-                place.region_id !== null
-                  ? regionMap.get(
-                      place.region_id
-                    ) ?? null
-                  : null,
+            regionName:
+              place.region_id !== null
+                ? regionMap.get(place.region_id) ?? null
+                : null,
 
-              areaName:
-                place.area_id !== null
-                  ? areaMap.get(
-                      place.area_id
-                    ) ?? null
-                  : null,
+            areaName:
+              place.area_id !== null
+                ? areaMap.get(place.area_id) ?? null
+                : null,
 
-              categoryName:
-                firstCategoryId !== undefined
-                  ? categoryMap.get(
-                      firstCategoryId
-                    ) ?? null
-                  : null,
+            categoryName:
+              firstCategoryId !== undefined
+                ? categoryMap.get(firstCategoryId) ?? null
+                : null,
 
-              categoryIds,
+            categoryIds,
 
-              imageUrl:
-                primaryImageMap.get(
-                  place.id
-                ) ?? null,
-            };
-          }
-        );
+            imageUrl:
+              primaryImageMap.get(place.id) ?? null,
+          };
+        }
+      );
 
       setPlaces(result);
       setRegions(loadedRegions);
       setAreas(loadedAreas);
       setCategories(loadedCategories);
-
       setLoading(false);
     }
 
@@ -348,8 +273,7 @@ export default function PlacesPage() {
 
     return areas.filter(
       (area) =>
-        area.region_id ===
-        Number(regionId)
+        area.region_id === Number(regionId)
     );
   }, [areas, regionId]);
 
@@ -357,16 +281,14 @@ export default function PlacesPage() {
     const result = places.filter((place) => {
       if (
         regionId &&
-        place.region_id !==
-          Number(regionId)
+        place.region_id !== Number(regionId)
       ) {
         return false;
       }
 
       if (
         areaId &&
-        place.area_id !==
-          Number(areaId)
+        place.area_id !== Number(areaId)
       ) {
         return false;
       }
@@ -385,19 +307,13 @@ export default function PlacesPage() {
 
     if (sortBy === "newest") {
       return [...result].sort((a, b) => {
-        const dateA =
-          a.created_at
-            ? new Date(
-                a.created_at
-              ).getTime()
-            : 0;
+        const dateA = a.created_at
+          ? new Date(a.created_at).getTime()
+          : 0;
 
-        const dateB =
-          b.created_at
-            ? new Date(
-                b.created_at
-              ).getTime()
-            : 0;
+        const dateB = b.created_at
+          ? new Date(b.created_at).getTime()
+          : 0;
 
         return dateB - dateA;
       });
@@ -410,13 +326,15 @@ export default function PlacesPage() {
     }
 
     return [...result].sort((a, b) => {
-      const orderA =
-        a.sort_order ?? 9999;
+      const dateA = a.created_at
+        ? new Date(a.created_at).getTime()
+        : 0;
 
-      const orderB =
-        b.sort_order ?? 9999;
+      const dateB = b.created_at
+        ? new Date(b.created_at).getTime()
+        : 0;
 
-      return orderA - orderB;
+      return dateB - dateA;
     });
   }, [
     places,
@@ -441,7 +359,6 @@ export default function PlacesPage() {
 
   return (
     <main style={styles.main}>
-
       <div
         className="places-main"
         style={styles.container}
@@ -459,9 +376,9 @@ export default function PlacesPage() {
           </h1>
 
           <p style={styles.description}>
-            Discover restaurants, cafés,
-            shops, hotels and places worth
-            visiting in Japan.
+            Discover restaurants, cafés, shops,
+            hotels and places worth visiting in
+            Japan.
           </p>
         </header>
 
@@ -500,10 +417,7 @@ export default function PlacesPage() {
               <select
                 value={regionId}
                 onChange={(e) => {
-                  setRegionId(
-                    e.target.value
-                  );
-
+                  setRegionId(e.target.value);
                   setAreaId("");
                 }}
                 style={styles.select}
@@ -533,9 +447,7 @@ export default function PlacesPage() {
               <select
                 value={areaId}
                 onChange={(e) =>
-                  setAreaId(
-                    e.target.value
-                  )
+                  setAreaId(e.target.value)
                 }
                 style={styles.select}
               >
@@ -564,9 +476,7 @@ export default function PlacesPage() {
               <select
                 value={categoryId}
                 onChange={(e) =>
-                  setCategoryId(
-                    e.target.value
-                  )
+                  setCategoryId(e.target.value)
                 }
                 style={styles.select}
               >
@@ -574,16 +484,14 @@ export default function PlacesPage() {
                   All categories
                 </option>
 
-                {categories.map(
-                  (category) => (
-                    <option
-                      key={category.id}
-                      value={category.id}
-                    >
-                      {category.name}
-                    </option>
-                  )
-                )}
+                {categories.map((category) => (
+                  <option
+                    key={category.id}
+                    value={category.id}
+                  >
+                    {category.name}
+                  </option>
+                ))}
               </select>
             </label>
 
@@ -598,8 +506,7 @@ export default function PlacesPage() {
                 value={sortBy}
                 onChange={(e) =>
                   setSortBy(
-                    e.target
-                      .value as SortOption
+                    e.target.value as SortOption
                   )
                 }
                 style={styles.select}
@@ -632,14 +539,18 @@ export default function PlacesPage() {
                 PLACES
               </p>
 
-              <h2 style={styles.resultsTitle}>
+              <h2
+                style={styles.resultsTitle}
+              >
                 {hasFilters
                   ? "Selected places"
                   : "All places"}
               </h2>
             </div>
 
-            <span style={styles.resultCount}>
+            <span
+              style={styles.resultCount}
+            >
               {loading
                 ? "—"
                 : `${filteredPlaces.length} places`}
@@ -671,27 +582,19 @@ export default function PlacesPage() {
               className="places-grid"
               style={styles.grid}
             >
-              {filteredPlaces.map(
-                (place) => (
-                  <PlaceCard
-                    key={place.id}
-                    id={place.id}
-                    name={place.name}
-                    imageUrl={place.imageUrl}
-                    category={
-                      place.categoryName
-                    }
-                    region={place.regionName}
-                    area={place.areaName}
-                    description={
-                      place.description
-                    }
-                    editorNote={
-                      place.editor_note
-                    }
-                  />
-                )
-              )}
+              {filteredPlaces.map((place) => (
+                <PlaceCard
+                  key={place.id}
+                  id={place.id}
+                  name={place.name}
+                  imageUrl={place.imageUrl}
+                  category={place.categoryName}
+                  region={place.regionName}
+                  area={place.areaName}
+                  description={place.description}
+                  editorNote={place.editor_note}
+                />
+              ))}
             </div>
           )}
         </section>
@@ -701,7 +604,7 @@ export default function PlacesPage() {
             href="/articles"
             style={styles.cta}
           >
-            Explore our guides
+            Explore our guides{" "}
             <span>→</span>
           </Link>
         </section>
@@ -711,18 +614,12 @@ export default function PlacesPage() {
         @media (max-width: 800px) {
           .places-filters-grid {
             grid-template-columns:
-              repeat(
-                2,
-                minmax(0, 1fr)
-              ) !important;
+              repeat(2, minmax(0, 1fr)) !important;
           }
 
           .places-grid {
             grid-template-columns:
-              repeat(
-                2,
-                minmax(0, 1fr)
-              ) !important;
+              repeat(2, minmax(0, 1fr)) !important;
           }
         }
 
@@ -747,12 +644,8 @@ export default function PlacesPage() {
           }
 
           .places-results-header {
-            align-items:
-              flex-start !important;
-
-            flex-direction:
-              column !important;
-
+            align-items: flex-start !important;
+            flex-direction: column !important;
             gap: 8px !important;
           }
 
