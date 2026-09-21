@@ -1,1050 +1,764 @@
-"use client";
-
-import Link from "next/link";
-import { useEffect, useMemo, useState } from "react";
+import { notFound } from "next/navigation";
+import SaveButton from "@/components/SaveButton";
 import { supabase } from "@/lib/supabase";
 
-type PlaceType = {
-  id: number;
-  name: string;
+type Place = {
+  id: string;
+  name: string | null;
+  description: string | null;
+  place_type_id: string | null;
+  area_id: string | null;
+
+  price_range: string | null;
+  editor_note: string | null;
+
+  postal_code: string | null;
+  address: string | null;
+  google_maps_url: string | null;
+
+  phone: string | null;
+  official_url: string | null;
+  instagram_url: string | null;
+  tabelog_url: string | null;
+
+  reservation: string | null;
+  english_support: string | null;
+  opening_hours: string | null;
+  closed_days: string | null;
+
+  seats: string | null;
+  counter_seats: string | null;
+  table_seats: string | null;
+
+  card: string | null;
+  tax_free: string | null;
+
+  image_url: string | null;
+
+  latitude: number | null;
+  longitude: number | null;
+
+  status?: string | null;
+};
+
+type PlaceImage = {
+  id: string;
+  image_url: string;
+  sort_order: number | null;
 };
 
 type Area = {
-  id: number;
-  name: string;
-};
-
-type PlaceStatus =
-  | "draft"
-  | "published"
-  | "hidden"
-  | "archived";
-
-type PlaceRow = {
   id: string;
-  name: string;
-  place_type_id: string;
-  area_id: string;
-  area_name: string;
-  address: string;
-  status: PlaceStatus;
-  isNew?: boolean;
-  isDirty?: boolean;
+  name: string | null;
 };
 
-const STATUS_OPTIONS: PlaceStatus[] = [
-  "draft",
-  "published",
-  "hidden",
-  "archived",
-];
+type PlaceProductRelation = {
+  product_id: string;
+};
 
-export default function PlacesPage() {
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [message, setMessage] = useState("");
-  const [errorMessage, setErrorMessage] = useState("");
+type Product = {
+  id: string;
+  name: string | null;
+  brand: string | null;
+  description: string | null;
+  image_url: string | null;
+  editor_pick: boolean | null;
+};
 
-  const [siteId, setSiteId] = useState("");
+type Station = {
+  id: string;
+  name: string | null;
+};
 
-  const [placeTypes, setPlaceTypes] = useState<PlaceType[]>([]);
-  const [areas, setAreas] = useState<Area[]>([]);
-  const [places, setPlaces] = useState<PlaceRow[]>([]);
+type PlaceAccess = {
+  station_id: string;
+  walk_minutes: number | null;
+};
 
-  const [activeTypeId, setActiveTypeId] = useState<string>("all");
-  const [search, setSearch] = useState("");
+type SupabaseErrorInfo = {
+  message: string;
+  details: string;
+  hint: string;
+  code: string;
+};
 
-  useEffect(() => {
-    loadData();
-  }, []);
+export default async function PlaceDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
 
-  async function loadData() {
-    setLoading(true);
-    setErrorMessage("");
+  /*
+   * places は select("*") にして、
+   * 現在のDBに実際に存在する列だけを取得する。
+   *
+   * 以前の group_id / region_id など、
+   * 現在のAdmin入力画面に存在しない列は一切指定しない。
+   */
+  const {
+    data: place,
+    error: placeError,
+  } = await supabase
+    .from("places")
+    .select("*")
+    .eq("id", id)
+    .eq("status", "published")
+    .maybeSingle();
 
-    try {
-      const { data: site, error: siteError } = await supabase
-        .from("sites")
-        .select("id")
-        .eq("slug", "tokyo-guide")
-        .single();
-
-      if (siteError || !site) {
-        throw new Error(
-          siteError?.message || "TOKYO GUIDE site could not be found."
-        );
-      }
-
-      setSiteId(site.id);
-
-      const [typesResult, areasResult, placesResult] =
-        await Promise.all([
-          supabase
-            .from("place_types")
-            .select("id, name")
-            .eq("site_id", site.id)
-            .eq("is_active", true)
-            .order("sort_order"),
-
-          supabase
-            .from("areas")
-            .select("id, name")
-            .eq("site_id", site.id)
-            .eq("is_active", true)
-            .order("name"),
-
-          supabase
-            .from("places")
-            .select(`
-              id,
-              name,
-              place_type_id,
-              area_id,
-              address,
-              status,
-              areas (
-                name
-              )
-            `)
-            .eq("site_id", site.id)
-            .order("created_at", { ascending: false }),
-        ]);
-
-      const firstError =
-        typesResult.error ||
-        areasResult.error ||
-        placesResult.error;
-
-      if (firstError) {
-        throw new Error(firstError.message);
-      }
-
-      const loadedTypes = typesResult.data ?? [];
-      const loadedAreas = areasResult.data ?? [];
-
-      setPlaceTypes(loadedTypes);
-      setAreas(loadedAreas);
-
-      const formattedPlaces: PlaceRow[] = (
-        placesResult.data ?? []
-      ).map((place: any) => {
-        const areaRelation = Array.isArray(place.areas)
-          ? place.areas[0]
-          : place.areas;
-
-        return {
-          id: place.id,
-          name: place.name ?? "",
-          place_type_id: place.place_type_id
-            ? String(place.place_type_id)
-            : "",
-          area_id: place.area_id
-            ? String(place.area_id)
-            : "",
-          area_name: areaRelation?.name ?? "",
-          address: place.address ?? "",
-          status: place.status ?? "draft",
-          isNew: false,
-          isDirty: false,
-        };
-      });
-
-      setPlaces(formattedPlaces);
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to load places."
-      );
-    } finally {
-      setLoading(false);
-    }
-  }
-
-  const filteredPlaces = useMemo(() => {
-    return places.filter((place) => {
-      const matchesType =
-        activeTypeId === "all" ||
-        place.place_type_id === activeTypeId;
-
-      const keyword = search.toLowerCase().trim();
-
-      const matchesSearch =
-        !keyword ||
-        place.name.toLowerCase().includes(keyword) ||
-        place.area_name.toLowerCase().includes(keyword) ||
-        place.address.toLowerCase().includes(keyword);
-
-      return matchesType && matchesSearch;
-    });
-  }, [places, activeTypeId, search]);
-
-  function updatePlace(
-    id: string,
-    field: keyof PlaceRow,
-    value: string
-  ) {
-    setPlaces((current) =>
-      current.map((place) => {
-        if (place.id !== id) return place;
-
-        const updated: PlaceRow = {
-          ...place,
-          [field]: value,
-          isDirty: true,
-        };
-
-        if (field === "area_name") {
-          const matchingArea = areas.find(
-            (area) =>
-              area.name.toLowerCase() ===
-              value.trim().toLowerCase()
-          );
-
-          updated.area_id = matchingArea
-            ? String(matchingArea.id)
-            : "";
-        }
-
-        return updated;
-      })
-    );
-
-    setMessage("");
-    setErrorMessage("");
-  }
-
-  function addNewRow() {
-    const temporaryId = `new-${Date.now()}`;
-
-    const defaultTypeId =
-      activeTypeId !== "all" ? activeTypeId : "";
-
-    const newRow: PlaceRow = {
-      id: temporaryId,
-      name: "",
-      place_type_id: defaultTypeId,
-      area_id: "",
-      area_name: "",
-      address: "",
-      status: "draft",
-      isNew: true,
-      isDirty: true,
+  if (placeError) {
+    const errorInfo: SupabaseErrorInfo = {
+      message: placeError.message ?? "",
+      details: placeError.details ?? "",
+      hint: placeError.hint ?? "",
+      code: placeError.code ?? "",
     };
 
-    setPlaces((current) => [newRow, ...current]);
-    setMessage("");
-    setErrorMessage("");
-  }
-
-  async function getOrCreateArea(
-    areaName: string,
-    currentSiteId: string
-  ): Promise<number | null> {
-    const trimmedName = areaName.trim();
-
-    if (!trimmedName) {
-      return null;
-    }
-
-    const existingArea = areas.find(
-      (area) =>
-        area.name.toLowerCase() ===
-        trimmedName.toLowerCase()
+    console.error(
+      "PLACE DETAIL SUPABASE ERROR:",
+      errorInfo
     );
 
-    if (existingArea) {
-      return existingArea.id;
-    }
-
-    const { data, error } = await supabase
-      .from("areas")
-      .insert({
-        site_id: currentSiteId,
-        name: trimmedName,
-        slug: createSlug(trimmedName),
-        is_active: true,
-      })
-      .select("id, name")
-      .single();
-
-    if (error || !data) {
-      throw new Error(
-        error?.message || `Failed to create area "${trimmedName}".`
-      );
-    }
-
-    setAreas((current) => [
-      ...current,
-      {
-        id: data.id,
-        name: data.name,
-      },
-    ]);
-
-    return data.id;
-  }
-
-  async function saveChanges() {
-    setSaving(true);
-    setMessage("");
-    setErrorMessage("");
-
-    try {
-      if (!siteId) {
-        throw new Error("Site information could not be loaded.");
-      }
-
-      const changedPlaces = places.filter(
-        (place) => place.isDirty || place.isNew
-      );
-
-      if (changedPlaces.length === 0) {
-        setMessage("No changes to save.");
-        setSaving(false);
-        return;
-      }
-
-      const savedIdMap = new Map<string, string>();
-
-      for (const place of changedPlaces) {
-        if (!place.name.trim()) {
-          throw new Error(
-            "Every new row needs a Place Name before saving."
-          );
-        }
-
-        const areaId = await getOrCreateArea(
-          place.area_name,
-          siteId
-        );
-
-        const payload = {
-          site_id: siteId,
-          name: place.name.trim(),
-          place_type_id: place.place_type_id
-            ? Number(place.place_type_id)
-            : null,
-          area_id: areaId,
-          address: place.address.trim() || null,
-          status: place.status,
-        };
-
-        if (place.isNew) {
-          const { data, error } = await supabase
-            .from("places")
-            .insert(payload)
-            .select("id")
-            .single();
-
-          if (error || !data) {
-            throw new Error(
-              error?.message ||
-                `Failed to create "${place.name}".`
-            );
-          }
-
-          savedIdMap.set(place.id, data.id);
-        } else {
-          const { error } = await supabase
-            .from("places")
-            .update(payload)
-            .eq("id", place.id);
-
-          if (error) {
-            throw new Error(
-              `Failed to update "${place.name}": ${error.message}`
-            );
-          }
-        }
-      }
-
-      setPlaces((current) =>
-        current.map((place) => {
-          const newId = savedIdMap.get(place.id);
-
-          return {
-            ...place,
-            id: newId ?? place.id,
-            isNew: false,
-            isDirty: false,
-          };
-        })
-      );
-
-      setMessage(
-        `${changedPlaces.length} place${
-          changedPlaces.length === 1 ? "" : "s"
-        } saved successfully ✦`
-      );
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Failed to save changes."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  async function deleteNewRow(id: string) {
-    setPlaces((current) =>
-      current.filter((place) => place.id !== id)
-    );
-  }
-
-  function createSlug(value: string) {
-    return value
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-");
-  }
-
-  if (loading) {
     return (
-      <main style={styles.page}>
-        <div style={styles.loading}>
-          Loading your database...
+      <main className="mx-auto max-w-5xl px-6 py-10">
+        <div className="rounded-xl border border-red-200 bg-red-50 p-6">
+          <h1 className="text-xl font-semibold text-red-700">
+            Place could not be loaded
+          </h1>
+
+          <div className="mt-4 space-y-2 text-sm text-red-700">
+            <p>
+              <strong>Message:</strong>{" "}
+              {errorInfo.message || "(empty)"}
+            </p>
+
+            <p>
+              <strong>Details:</strong>{" "}
+              {errorInfo.details || "(empty)"}
+            </p>
+
+            <p>
+              <strong>Hint:</strong>{" "}
+              {errorInfo.hint || "(empty)"}
+            </p>
+
+            <p>
+              <strong>Code:</strong>{" "}
+              {errorInfo.code || "(empty)"}
+            </p>
+
+            <p>
+              <strong>Place ID:</strong> {id}
+            </p>
+          </div>
         </div>
       </main>
     );
   }
 
+  if (!place) {
+    notFound();
+  }
+
+  /*
+   * Images
+   */
+  const {
+    data: placeImages,
+    error: imagesError,
+  } = await supabase
+    .from("place_images")
+    .select("id,image_url,sort_order")
+    .eq("place_id", place.id)
+    .order("sort_order", {
+      ascending: true,
+    });
+
+  if (imagesError) {
+    console.error(
+      "PLACE IMAGES SUPABASE ERROR:",
+      {
+        message: imagesError.message ?? "",
+        details: imagesError.details ?? "",
+        hint: imagesError.hint ?? "",
+        code: imagesError.code ?? "",
+      }
+    );
+  }
+
+  /*
+   * Area
+   */
+  let area: Area | null = null;
+
+  if (place.area_id) {
+    const {
+      data: areaData,
+      error: areaError,
+    } = await supabase
+      .from("areas")
+      .select("id,name")
+      .eq("id", place.area_id)
+      .maybeSingle();
+
+    if (areaError) {
+      console.error(
+        "PLACE AREA SUPABASE ERROR:",
+        {
+          message: areaError.message ?? "",
+          details: areaError.details ?? "",
+          hint: areaError.hint ?? "",
+          code: areaError.code ?? "",
+        }
+      );
+    }
+
+    area = areaData;
+  }
+
+  /*
+   * Products linked to this place
+   */
+  const {
+    data: placeProductRelations,
+    error: placeProductsError,
+  } = await supabase
+    .from("place_products")
+    .select("product_id")
+    .eq("place_id", place.id)
+    .eq("available", true);
+
+  if (placeProductsError) {
+    console.error(
+      "PLACE PRODUCTS SUPABASE ERROR:",
+      {
+        message: placeProductsError.message ?? "",
+        details: placeProductsError.details ?? "",
+        hint: placeProductsError.hint ?? "",
+        code: placeProductsError.code ?? "",
+      }
+    );
+  }
+
+  let products: Product[] = [];
+
+  const productIds =
+    placeProductRelations?.map(
+      (row: PlaceProductRelation) => row.product_id
+    ) ?? [];
+
+  if (productIds.length > 0) {
+    const {
+      data: productData,
+      error: productsError,
+    } = await supabase
+      .from("products")
+      .select(
+        "id,name,brand,description,image_url,editor_pick"
+      )
+      .in("id", productIds)
+      .eq("status", "published");
+
+    if (productsError) {
+      console.error(
+        "PRODUCTS SUPABASE ERROR:",
+        {
+          message: productsError.message ?? "",
+          details: productsError.details ?? "",
+          hint: productsError.hint ?? "",
+          code: productsError.code ?? "",
+        }
+      );
+    }
+
+    products = productData ?? [];
+  }
+
+  /*
+   * Access / stations
+   *
+   * AdminのPlace登録画面で登録した
+   * place_access も詳細ページに表示する。
+   */
+  const {
+    data: accessRows,
+    error: accessError,
+  } = await supabase
+    .from("place_access")
+    .select("station_id,walk_minutes")
+    .eq("place_id", place.id);
+
+  if (accessError) {
+    console.error(
+      "PLACE ACCESS SUPABASE ERROR:",
+      {
+        message: accessError.message ?? "",
+        details: accessError.details ?? "",
+        hint: accessError.hint ?? "",
+        code: accessError.code ?? "",
+      }
+    );
+  }
+
+  let access: Array<
+    PlaceAccess & {
+      station: Station | null;
+    }
+  > = [];
+
+  const stationIds =
+    accessRows?.map(
+      (row: PlaceAccess) => row.station_id
+    ) ?? [];
+
+  if (stationIds.length > 0) {
+    const {
+      data: stations,
+      error: stationsError,
+    } = await supabase
+      .from("stations")
+      .select("id,name")
+      .in("id", stationIds);
+
+    if (stationsError) {
+      console.error(
+        "STATIONS SUPABASE ERROR:",
+        {
+          message: stationsError.message ?? "",
+          details: stationsError.details ?? "",
+          hint: stationsError.hint ?? "",
+          code: stationsError.code ?? "",
+        }
+      );
+    }
+
+    access =
+      accessRows?.map((row) => ({
+        ...row,
+        station:
+          stations?.find(
+            (station) =>
+              station.id === row.station_id
+          ) ?? null,
+      })) ?? [];
+  }
+
+  const images: PlaceImage[] = placeImages ?? [];
+
+  const heroImage =
+    images[0]?.image_url ||
+    place.image_url ||
+    null;
+
+  const galleryImages = images.slice(1);
+
   return (
-    <main style={styles.page}>
-      <div style={styles.container}>
-        {/* HEADER */}
+    <main className="mx-auto max-w-6xl px-6 py-10">
+      <div className="space-y-10">
+        {/* Hero */}
+        <section>
+          {heroImage ? (
+            <div className="overflow-hidden rounded-2xl">
+              <img
+                src={heroImage}
+                alt={place.name ?? ""}
+                className="h-[420px] w-full object-cover"
+              />
+            </div>
+          ) : (
+            <div className="flex h-[420px] items-center justify-center rounded-2xl bg-gray-100 text-sm text-gray-400">
+              No image
+            </div>
+          )}
+        </section>
 
-        <div style={styles.header}>
-          <div>
-            <p style={styles.eyebrow}>
-              TOKYO GUIDE ADMIN
-            </p>
+        {/* Basic information */}
+        <section>
+          <div className="flex flex-col gap-5 md:flex-row md:items-start md:justify-between">
+            <div>
+              {area?.name && (
+                <p className="mb-2 text-sm text-gray-500">
+                  {area.name}
+                </p>
+              )}
 
-            <h1 style={styles.title}>
-              Places Database ✦
-            </h1>
+              <h1 className="text-4xl font-semibold tracking-tight">
+                {place.name}
+              </h1>
+            </div>
 
-            <p style={styles.subtitle}>
-              Your Tokyo address book — add and edit places directly here.
-            </p>
+            <SaveButton
+  type="place"
+  itemId={place.id}
+/>
           </div>
 
-          <div style={styles.headerButtons}>
-            <Link
-              href="/admin/places/new"
-              style={styles.detailButton}
-            >
-              ＋ Detailed Entry
-            </Link>
+          <div className="mt-6 space-y-5">
+            {place.price_range && (
+              <p className="text-sm text-gray-600">
+                {place.price_range}
+              </p>
+            )}
 
-            <button
-              onClick={saveChanges}
-              disabled={saving}
-              style={styles.saveButton}
-            >
-              {saving ? "Saving..." : "Save Changes ✦"}
-            </button>
+            {place.description && (
+              <div>
+                <h2 className="mb-2 text-lg font-semibold">
+                  About
+                </h2>
+
+                <p className="whitespace-pre-line text-sm leading-7 text-gray-700">
+                  {place.description}
+                </p>
+              </div>
+            )}
+
+            {place.editor_note && (
+              <div className="rounded-xl border bg-gray-50 p-5">
+                <h2 className="mb-2 text-sm font-semibold">
+                  Editor's Note
+                </h2>
+
+                <p className="whitespace-pre-line text-sm leading-6 text-gray-700">
+                  {place.editor_note}
+                </p>
+              </div>
+            )}
           </div>
-        </div>
+        </section>
 
-        {/* MESSAGE */}
+        {/* Location */}
+        {(place.postal_code ||
+          place.address ||
+          place.google_maps_url) && (
+          <section className="rounded-2xl border p-6">
+            <h2 className="mb-5 text-xl font-semibold">
+              Location
+            </h2>
 
-        {errorMessage && (
-          <div style={styles.errorMessage}>
-            {errorMessage}
-          </div>
+            <div className="space-y-3 text-sm">
+              {place.postal_code && (
+                <p>
+                  <span className="font-medium">
+                    Postal Code
+                  </span>
+                  <br />
+                  {place.postal_code}
+                </p>
+              )}
+
+              {place.address && (
+                <p>
+                  <span className="font-medium">
+                    Address
+                  </span>
+                  <br />
+                  {place.address}
+                </p>
+              )}
+
+              {place.google_maps_url && (
+                <a
+                  href={place.google_maps_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="inline-block underline"
+                >
+                  Open in Google Maps
+                </a>
+              )}
+            </div>
+          </section>
         )}
 
-        {message && (
-          <div style={styles.successMessage}>
-            {message}
-          </div>
+        {/* Access */}
+        {access.length > 0 && (
+          <section className="rounded-2xl border p-6">
+            <h2 className="mb-5 text-xl font-semibold">
+              Access
+            </h2>
+
+            <div className="space-y-3">
+              {access.map((row) => (
+                <div
+                  key={`${row.station_id}-${row.walk_minutes}`}
+                  className="flex items-center justify-between border-b pb-3 last:border-b-0"
+                >
+                  <span className="text-sm">
+                    {row.station?.name ??
+                      "Station"}
+                  </span>
+
+                  {row.walk_minutes !== null && (
+                    <span className="text-sm text-gray-500">
+                      {row.walk_minutes} min walk
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
         )}
 
-        {/* TYPE TABS */}
+        {/* Store information */}
+        {(place.opening_hours ||
+          place.closed_days ||
+          place.reservation ||
+          place.english_support ||
+          place.seats ||
+          place.counter_seats ||
+          place.table_seats ||
+          place.card ||
+          place.tax_free ||
+          place.phone) && (
+          <section className="rounded-2xl border p-6">
+            <h2 className="mb-5 text-xl font-semibold">
+              Information
+            </h2>
 
-        <div style={styles.tabs}>
-          <button
-            onClick={() => setActiveTypeId("all")}
-            style={{
-              ...styles.tab,
-              ...(activeTypeId === "all"
-                ? styles.activeTab
-                : {}),
-            }}
-          >
-            All Places
-          </button>
+            <div className="grid gap-6 md:grid-cols-2">
+              {place.opening_hours && (
+                <div>
+                  <h3 className="mb-1 text-sm font-medium">
+                    Opening Hours
+                  </h3>
 
-          {placeTypes.map((type) => (
-            <button
-              key={type.id}
-              onClick={() =>
-                setActiveTypeId(String(type.id))
-              }
-              style={{
-                ...styles.tab,
-                ...(activeTypeId === String(type.id)
-                  ? styles.activeTab
-                  : {}),
-              }}
-            >
-              {type.name}
-            </button>
-          ))}
-        </div>
+                  <p className="whitespace-pre-line text-sm text-gray-600">
+                    {place.opening_hours}
+                  </p>
+                </div>
+              )}
 
-        {/* TOOLBAR */}
+              {place.closed_days && (
+                <div>
+                  <h3 className="mb-1 text-sm font-medium">
+                    Closed Days
+                  </h3>
 
-        <div style={styles.toolbar}>
-          <input
-            value={search}
-            onChange={(e) => setSearch(e.target.value)}
-            placeholder="⌕ Search places..."
-            style={styles.search}
-          />
+                  <p className="text-sm text-gray-600">
+                    {place.closed_days}
+                  </p>
+                </div>
+              )}
 
-          <div style={styles.toolbarRight}>
-            <span style={styles.count}>
-              {filteredPlaces.length} places
-            </span>
+              {place.reservation && (
+                <div>
+                  <h3 className="mb-1 text-sm font-medium">
+                    Reservation
+                  </h3>
 
-            <button
-              onClick={addNewRow}
-              style={styles.addButton}
-            >
-              ＋ Add Row
-            </button>
-          </div>
-        </div>
+                  <p className="text-sm text-gray-600">
+                    {place.reservation}
+                  </p>
+                </div>
+              )}
 
-        {/* DATABASE */}
+              {place.english_support && (
+                <div>
+                  <h3 className="mb-1 text-sm font-medium">
+                    English Support
+                  </h3>
 
-        <div style={styles.databaseCard}>
-          <div style={styles.tableWrapper}>
-            <table style={styles.table}>
-              <thead>
-                <tr>
-                  <th style={styles.th}>Place Name</th>
-                  <th style={styles.th}>Type</th>
-                  <th style={styles.th}>Area</th>
-                  <th style={styles.th}>Address</th>
-                  <th style={styles.th}>Status</th>
-                  <th style={styles.thAction}>Details</th>
-                </tr>
-              </thead>
+                  <p className="text-sm text-gray-600">
+                    {place.english_support}
+                  </p>
+                </div>
+              )}
 
-              <tbody>
-                {filteredPlaces.map((place) => (
-                  <tr
-                    key={place.id}
-                    style={
-                      place.isNew
-                        ? styles.newRow
-                        : place.isDirty
-                        ? styles.dirtyRow
-                        : {}
-                    }
-                  >
-                    {/* NAME */}
+              {place.seats && (
+                <div>
+                  <h3 className="mb-1 text-sm font-medium">
+                    Total Seats
+                  </h3>
 
-                    <td style={styles.td}>
-                      <input
-                        value={place.name}
-                        onChange={(e) =>
-                          updatePlace(
-                            place.id,
-                            "name",
-                            e.target.value
-                          )
-                        }
-                        placeholder="Place name"
-                        style={styles.cellInput}
-                      />
-                    </td>
+                  <p className="text-sm text-gray-600">
+                    {place.seats}
+                  </p>
+                </div>
+              )}
 
-                    {/* TYPE */}
+              {place.counter_seats && (
+                <div>
+                  <h3 className="mb-1 text-sm font-medium">
+                    Counter Seats
+                  </h3>
 
-                    <td style={styles.td}>
-                      <select
-                        value={place.place_type_id}
-                        onChange={(e) =>
-                          updatePlace(
-                            place.id,
-                            "place_type_id",
-                            e.target.value
-                          )
-                        }
-                        style={styles.cellSelect}
-                      >
-                        <option value="">—</option>
+                  <p className="text-sm text-gray-600">
+                    {place.counter_seats}
+                  </p>
+                </div>
+              )}
 
-                        {placeTypes.map((type) => (
-                          <option
-                            key={type.id}
-                            value={type.id}
-                          >
-                            {type.name}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+              {place.table_seats && (
+                <div>
+                  <h3 className="mb-1 text-sm font-medium">
+                    Table Seats
+                  </h3>
 
-                    {/* AREA */}
+                  <p className="text-sm text-gray-600">
+                    {place.table_seats}
+                  </p>
+                </div>
+              )}
 
-                    <td style={styles.td}>
-                      <input
-                        list={`area-options-${place.id}`}
-                        value={place.area_name}
-                        onChange={(e) =>
-                          updatePlace(
-                            place.id,
-                            "area_name",
-                            e.target.value
-                          )
-                        }
-                        placeholder="Type area..."
-                        style={styles.cellInput}
-                      />
+              {place.card && (
+                <div>
+                  <h3 className="mb-1 text-sm font-medium">
+                    Card
+                  </h3>
 
-                      <datalist
-                        id={`area-options-${place.id}`}
-                      >
-                        {areas.map((area) => (
-                          <option
-                            key={area.id}
-                            value={area.name}
-                          />
-                        ))}
-                      </datalist>
-                    </td>
+                  <p className="text-sm text-gray-600">
+                    {place.card}
+                  </p>
+                </div>
+              )}
 
-                    {/* ADDRESS */}
+              {place.tax_free && (
+                <div>
+                  <h3 className="mb-1 text-sm font-medium">
+                    Tax Free
+                  </h3>
 
-                    <td style={styles.td}>
-                      <input
-                        value={place.address}
-                        onChange={(e) =>
-                          updatePlace(
-                            place.id,
-                            "address",
-                            e.target.value
-                          )
-                        }
-                        placeholder="Address"
-                        style={styles.cellInput}
-                      />
-                    </td>
+                  <p className="text-sm text-gray-600">
+                    {place.tax_free}
+                  </p>
+                </div>
+              )}
 
-                    {/* STATUS */}
+              {place.phone && (
+                <div>
+                  <h3 className="mb-1 text-sm font-medium">
+                    Phone
+                  </h3>
 
-                    <td style={styles.td}>
-                      <select
-                        value={place.status}
-                        onChange={(e) =>
-                          updatePlace(
-                            place.id,
-                            "status",
-                            e.target.value
-                          )
-                        }
-                        style={styles.statusSelect}
-                      >
-                        {STATUS_OPTIONS.map((status) => (
-                          <option
-                            key={status}
-                            value={status}
-                          >
-                            {status}
-                          </option>
-                        ))}
-                      </select>
-                    </td>
+                  <p className="text-sm text-gray-600">
+                    {place.phone}
+                  </p>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
-                    {/* DETAILS */}
+        {/* Links */}
+        {(place.official_url ||
+          place.instagram_url ||
+          place.tabelog_url) && (
+          <section className="rounded-2xl border p-6">
+            <h2 className="mb-5 text-xl font-semibold">
+              Links
+            </h2>
 
-                    <td style={styles.tdAction}>
-                      {place.isNew ? (
-                        <button
-                          onClick={() =>
-                            deleteNewRow(place.id)
-                          }
-                          style={styles.removeButton}
-                        >
-                          ×
-                        </button>
-                      ) : (
-                        <Link
-                          href={`/admin/places/${place.id}`}
-                          style={styles.editButton}
-                        >
-                          Edit →
-                        </Link>
-                      )}
-                    </td>
-                  </tr>
-                ))}
+            <div className="flex flex-wrap gap-4 text-sm">
+              {place.official_url && (
+                <a
+                  href={place.official_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Official Website
+                </a>
+              )}
 
-                {filteredPlaces.length === 0 && (
-                  <tr>
-                    <td
-                      colSpan={6}
-                      style={styles.empty}
-                    >
-                      No places here yet ✦
-                    </td>
-                  </tr>
-                )}
-              </tbody>
-            </table>
-          </div>
+              {place.instagram_url && (
+                <a
+                  href={place.instagram_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Instagram
+                </a>
+              )}
 
-          <button
-            onClick={addNewRow}
-            style={styles.bottomAddButton}
-          >
-            ＋ Add a new place
-          </button>
-        </div>
+              {place.tabelog_url && (
+                <a
+                  href={place.tabelog_url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="underline"
+                >
+                  Tabelog
+                </a>
+              )}
+            </div>
+          </section>
+        )}
 
-        {/* FOOTER SAVE */}
+        {/* Gallery */}
+        {galleryImages.length > 0 && (
+          <section>
+            <h2 className="mb-5 text-xl font-semibold">
+              Gallery
+            </h2>
 
-        <div style={styles.footer}>
-          <span style={styles.footerText}>
-            Changes are highlighted until saved.
-          </span>
+            <div className="grid gap-4 md:grid-cols-3">
+              {galleryImages.map((image) => (
+                <div
+                  key={image.id}
+                  className="overflow-hidden rounded-xl"
+                >
+                  <img
+                    src={image.image_url}
+                    alt={place.name ?? ""}
+                    className="aspect-square w-full object-cover"
+                  />
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
 
-          <button
-            onClick={saveChanges}
-            disabled={saving}
-            style={styles.saveButton}
-          >
-            {saving ? "Saving..." : "Save Changes ✦"}
-          </button>
-        </div>
+        {/* Products */}
+        {products.length > 0 && (
+          <section>
+            <h2 className="mb-5 text-xl font-semibold">
+              Products
+            </h2>
+
+            <div className="grid gap-6 md:grid-cols-3">
+              {products.map((product) => (
+                <article
+                  key={product.id}
+                  className="overflow-hidden rounded-xl border"
+                >
+                  {product.image_url && (
+                    <img
+                      src={product.image_url}
+                      alt={product.name ?? ""}
+                      className="aspect-square w-full object-cover"
+                    />
+                  )}
+
+                  <div className="p-4">
+                    {product.brand && (
+                      <p className="text-xs text-gray-500">
+                        {product.brand}
+                      </p>
+                    )}
+
+                    <h3 className="mt-1 font-semibold">
+                      {product.name}
+                    </h3>
+
+                    {product.description && (
+                      <p className="mt-2 text-sm leading-6 text-gray-600">
+                        {product.description}
+                      </p>
+                    )}
+
+                    {product.editor_pick && (
+                      <p className="mt-3 text-xs font-medium">
+                        Editor's Pick
+                      </p>
+                    )}
+                  </div>
+                </article>
+              ))}
+            </div>
+          </section>
+        )}
       </div>
     </main>
   );
 }
-
-const styles: Record<string, React.CSSProperties> = {
-  page: {
-    minHeight: "100vh",
-    padding: "40px 24px 100px",
-    background:
-      "linear-gradient(135deg, #fff8fb 0%, #f8f5ff 50%, #fffaf5 100%)",
-    color: "#463c46",
-  },
-
-  container: {
-    maxWidth: "1500px",
-    margin: "0 auto",
-  },
-
-  loading: {
-    padding: "120px 20px",
-    textAlign: "center",
-    color: "#967c8d",
-    fontSize: "16px",
-  },
-
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "flex-end",
-    gap: "24px",
-    marginBottom: "28px",
-  },
-
-  eyebrow: {
-    margin: "0 0 8px",
-    color: "#b2819c",
-    fontSize: "11px",
-    fontWeight: 800,
-    letterSpacing: "0.14em",
-  },
-
-  title: {
-    margin: 0,
-    fontSize: "38px",
-    letterSpacing: "-1.5px",
-  },
-
-  subtitle: {
-    margin: "10px 0 0",
-    color: "#9a8491",
-    fontSize: "14px",
-  },
-
-  headerButtons: {
-    display: "flex",
-    gap: "10px",
-    alignItems: "center",
-    flexWrap: "wrap",
-  },
-
-  detailButton: {
-    textDecoration: "none",
-    padding: "13px 18px",
-    borderRadius: "14px",
-    background: "#fff",
-    border: "1px solid #eadbe4",
-    color: "#806878",
-    fontSize: "14px",
-    fontWeight: 700,
-  },
-
-  saveButton: {
-    border: "none",
-    padding: "14px 20px",
-    borderRadius: "14px",
-    background:
-      "linear-gradient(135deg, #e99bb9, #c69ae1)",
-    color: "#fff",
-    fontWeight: 800,
-    cursor: "pointer",
-    fontSize: "14px",
-    boxShadow: "0 8px 20px rgba(202,143,177,0.25)",
-  },
-
-  tabs: {
-    display: "flex",
-    gap: "8px",
-    flexWrap: "wrap",
-    marginBottom: "18px",
-  },
-
-  tab: {
-    border: "1px solid #eadce5",
-    background: "rgba(255,255,255,0.7)",
-    color: "#806c78",
-    padding: "10px 17px",
-    borderRadius: "999px",
-    cursor: "pointer",
-    fontWeight: 700,
-    fontSize: "13px",
-  },
-
-  activeTab: {
-    background: "#f7dbe7",
-    border: "1px solid #e9b7cc",
-    color: "#87546d",
-  },
-
-  toolbar: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "16px",
-    marginBottom: "14px",
-  },
-
-  toolbarRight: {
-    display: "flex",
-    alignItems: "center",
-    gap: "14px",
-  },
-
-  search: {
-    width: "320px",
-    maxWidth: "100%",
-    height: "46px",
-    padding: "0 15px",
-    borderRadius: "13px",
-    border: "1px solid #eadce5",
-    background: "#fff",
-    outline: "none",
-    boxSizing: "border-box",
-  },
-
-  count: {
-    color: "#a08a97",
-    fontSize: "13px",
-    whiteSpace: "nowrap",
-  },
-
-  addButton: {
-    border: "none",
-    background: "#fff",
-    borderRadius: "13px",
-    padding: "12px 17px",
-    color: "#a05d7e",
-    fontWeight: 800,
-    cursor: "pointer",
-    borderColor: "#efcfdd",
-    boxShadow: "0 3px 12px rgba(170,120,145,0.08)",
-  },
-
-  databaseCard: {
-    background: "rgba(255,255,255,0.88)",
-    border: "1px solid #eedfe7",
-    borderRadius: "22px",
-    overflow: "hidden",
-    boxShadow: "0 12px 40px rgba(169,119,145,0.08)",
-  },
-
-  tableWrapper: {
-    width: "100%",
-    overflowX: "auto",
-  },
-
-  table: {
-    width: "100%",
-    minWidth: "900px",
-    borderCollapse: "collapse",
-  },
-
-  th: {
-    padding: "15px 14px",
-    textAlign: "left",
-    fontSize: "11px",
-    letterSpacing: "0.08em",
-    color: "#9a7e8d",
-    background: "#fff8fb",
-    borderBottom: "1px solid #f0e1e8",
-    whiteSpace: "nowrap",
-  },
-
-  thAction: {
-    padding: "15px 14px",
-    textAlign: "center",
-    fontSize: "11px",
-    letterSpacing: "0.08em",
-    color: "#9a7e8d",
-    background: "#fff8fb",
-    borderBottom: "1px solid #f0e1e8",
-  },
-
-  td: {
-    padding: "9px 10px",
-    borderBottom: "1px solid #f5eaf0",
-  },
-
-  tdAction: {
-    padding: "9px 12px",
-    borderBottom: "1px solid #f5eaf0",
-    textAlign: "center",
-  },
-
-  cellInput: {
-    width: "100%",
-    minWidth: "130px",
-    height: "40px",
-    padding: "0 10px",
-    border: "1px solid transparent",
-    background: "transparent",
-    borderRadius: "9px",
-    outline: "none",
-    boxSizing: "border-box",
-    color: "#4d424a",
-  },
-
-  cellSelect: {
-    width: "100%",
-    minWidth: "130px",
-    height: "40px",
-    padding: "0 8px",
-    border: "1px solid transparent",
-    background: "transparent",
-    borderRadius: "9px",
-    color: "#4d424a",
-    cursor: "pointer",
-  },
-
-  statusSelect: {
-    width: "100%",
-    minWidth: "110px",
-    height: "38px",
-    padding: "0 8px",
-    border: "1px solid #eedde6",
-    background: "#fff8fb",
-    borderRadius: "999px",
-    color: "#876576",
-    fontSize: "12px",
-    fontWeight: 700,
-    cursor: "pointer",
-  },
-
-  newRow: {
-    background: "#fff8ec",
-  },
-
-  dirtyRow: {
-    background: "#fff9fc",
-  },
-
-  editButton: {
-    display: "inline-block",
-    textDecoration: "none",
-    padding: "8px 12px",
-    borderRadius: "9px",
-    background: "#f8efff",
-    color: "#8965a5",
-    fontSize: "12px",
-    fontWeight: 800,
-  },
-
-  removeButton: {
-    width: "32px",
-    height: "32px",
-    borderRadius: "50%",
-    border: "none",
-    background: "#fff0f2",
-    color: "#c47385",
-    fontSize: "18px",
-    cursor: "pointer",
-  },
-
-  empty: {
-    padding: "60px 20px",
-    textAlign: "center",
-    color: "#aa929f",
-  },
-
-  bottomAddButton: {
-    width: "100%",
-    padding: "17px",
-    border: "none",
-    borderTop: "1px solid #f0e1e8",
-    background: "#fffafd",
-    color: "#a76686",
-    fontWeight: 800,
-    cursor: "pointer",
-    fontSize: "14px",
-  },
-
-  footer: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginTop: "20px",
-    gap: "20px",
-  },
-
-  footerText: {
-    color: "#a38b98",
-    fontSize: "12px",
-  },
-
-  errorMessage: {
-    marginBottom: "18px",
-    padding: "15px 18px",
-    borderRadius: "14px",
-    background: "#fff0f2",
-    border: "1px solid #f2c3cc",
-    color: "#ad5367",
-  },
-
-  successMessage: {
-    marginBottom: "18px",
-    padding: "15px 18px",
-    borderRadius: "14px",
-    background: "#f4fff7",
-    border: "1px solid #cfe9d7",
-    color: "#528567",
-  },
-};

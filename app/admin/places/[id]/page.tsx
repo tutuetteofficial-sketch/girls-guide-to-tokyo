@@ -63,6 +63,10 @@ export default function EditPlacePage() {
   const [postalCode, setPostalCode] = useState("");
   const [address, setAddress] = useState("");
 
+  // Map coordinates
+  const [latitude, setLatitude] = useState<number | null>(null);
+  const [longitude, setLongitude] = useState<number | null>(null);
+
   const [phone, setPhone] = useState("");
 
   const [priceRange, setPriceRange] = useState("");
@@ -89,7 +93,9 @@ export default function EditPlacePage() {
 
   const [status, setStatus] = useState("draft");
 
-  const [selectedStations, setSelectedStations] = useState<AccessRow[]>([]);
+  const [selectedStations, setSelectedStations] = useState<
+    AccessRow[]
+  >([]);
 
   useEffect(() => {
     if (placeId) {
@@ -140,7 +146,9 @@ export default function EditPlacePage() {
 
       supabase
         .from("place_access")
-        .select("id, station_id, station_exit, walk_minutes, sort_order")
+        .select(
+          "id, station_id, station_exit, walk_minutes, sort_order"
+        )
         .eq("place_id", placeId)
         .order("sort_order"),
     ]);
@@ -159,9 +167,21 @@ export default function EditPlacePage() {
     setStations(stationResult.data || []);
 
     setName(place.name || "");
-    setPlaceTypeId(place.place_type_id ? String(place.place_type_id) : "");
-    setRegionId(place.region_id ? String(place.region_id) : "");
-    setAreaId(place.area_id ? String(place.area_id) : "");
+    setPlaceTypeId(
+      place.place_type_id
+        ? String(place.place_type_id)
+        : ""
+    );
+    setRegionId(
+      place.region_id
+        ? String(place.region_id)
+        : ""
+    );
+    setAreaId(
+      place.area_id
+        ? String(place.area_id)
+        : ""
+    );
 
     setDescription(place.description || "");
     setEditorNote(place.editor_note || "");
@@ -169,16 +189,40 @@ export default function EditPlacePage() {
     setPostalCode(place.postal_code || "");
     setAddress(place.address || "");
 
+    setLatitude(
+      place.latitude !== null &&
+        place.latitude !== undefined
+        ? Number(place.latitude)
+        : null
+    );
+
+    setLongitude(
+      place.longitude !== null &&
+        place.longitude !== undefined
+        ? Number(place.longitude)
+        : null
+    );
+
     setPhone(place.phone || "");
 
     setPriceRange(place.price_range || "");
 
-    setSeats(place.seats !== null ? String(place.seats) : "");
-    setCounterSeats(
-      place.counter_seats !== null ? String(place.counter_seats) : ""
+    setSeats(
+      place.seats !== null
+        ? String(place.seats)
+        : ""
     );
+
+    setCounterSeats(
+      place.counter_seats !== null
+        ? String(place.counter_seats)
+        : ""
+    );
+
     setTableSeats(
-      place.table_seats !== null ? String(place.table_seats) : ""
+      place.table_seats !== null
+        ? String(place.table_seats)
+        : ""
     );
 
     setReservation(place.reservation || "");
@@ -219,7 +263,10 @@ export default function EditPlacePage() {
   }
 
   const filteredAreas = regionId
-    ? areas.filter((area) => area.region_id === Number(regionId))
+    ? areas.filter(
+        (area) =>
+          area.region_id === Number(regionId)
+      )
     : [];
 
   function addStation() {
@@ -250,11 +297,59 @@ export default function EditPlacePage() {
 
   function removeStation(index: number) {
     setSelectedStations(
-      selectedStations.filter((_, i) => i !== index)
+      selectedStations.filter(
+        (_, i) => i !== index
+      )
     );
   }
 
-  async function handleSubmit(e: React.FormEvent) {
+  async function geocodeAddress(
+    addressToSearch: string
+  ) {
+    const response = await fetch("/api/geocode", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+      },
+      body: JSON.stringify({
+        address: addressToSearch,
+      }),
+    });
+
+    const result = await response.json();
+
+    if (!response.ok) {
+      throw new Error(
+        result.error ||
+          "Could not find this address."
+      );
+    }
+
+    const nextLatitude = Number(
+      result.latitude
+    );
+    const nextLongitude = Number(
+      result.longitude
+    );
+
+    if (
+      !Number.isFinite(nextLatitude) ||
+      !Number.isFinite(nextLongitude)
+    ) {
+      throw new Error(
+        "Could not get valid coordinates for this address."
+      );
+    }
+
+    return {
+      latitude: nextLatitude,
+      longitude: nextLongitude,
+    };
+  }
+
+  async function handleSubmit(
+    e: React.FormEvent
+  ) {
     e.preventDefault();
 
     if (!name.trim()) {
@@ -264,126 +359,219 @@ export default function EditPlacePage() {
 
     setSaving(true);
 
-    const { error: placeError } = await supabase
-      .from("places")
-      .update({
-        place_type_id: placeTypeId
-          ? Number(placeTypeId)
-          : null,
+    try {
+      let nextLatitude = latitude;
+      let nextLongitude = longitude;
 
-        region_id: regionId
-          ? Number(regionId)
-          : null,
+      const trimmedAddress = address.trim();
 
-        area_id: areaId
-          ? Number(areaId)
-          : null,
+      /*
+       * Addressが入力されている場合は、
+       * 保存時に必ず最新の住所から座標を取得する。
+       */
+      if (trimmedAddress) {
+        const coordinates =
+          await geocodeAddress(
+            trimmedAddress
+          );
 
-        name: name.trim(),
+        nextLatitude =
+          coordinates.latitude;
+        nextLongitude =
+          coordinates.longitude;
 
-        description: description || null,
-        editor_note: editorNote || null,
+        setLatitude(nextLatitude);
+        setLongitude(nextLongitude);
+      } else {
+        /*
+         * 住所を空にした場合は、
+         * 地図上の座標もクリアする。
+         */
+        nextLatitude = null;
+        nextLongitude = null;
 
-        postal_code: postalCode || null,
-        address: address || null,
-
-        phone: phone || null,
-
-        price_range: priceRange || null,
-
-        seats: seats ? Number(seats) : null,
-
-        counter_seats: counterSeats
-          ? Number(counterSeats)
-          : null,
-
-        table_seats: tableSeats
-          ? Number(tableSeats)
-          : null,
-
-        reservation: reservation || null,
-        english_support: englishSupport || null,
-
-        card,
-        tax_free: taxFree,
-
-        opening_hours: openingHours || null,
-        closed_days: closedDays || null,
-
-        official_url: officialUrl || null,
-        instagram_url: instagramUrl || null,
-        tabelog_url: tabelogUrl || null,
-        google_maps_url: googleMapsUrl || null,
-
-        image_url: imageUrl || null,
-
-        status,
-
-        updated_at: new Date().toISOString(),
-      })
-      .eq("id", placeId);
-
-    if (placeError) {
-      alert(placeError.message);
-      setSaving(false);
-      return;
-    }
-
-    const { error: deleteAccessError } = await supabase
-      .from("place_access")
-      .delete()
-      .eq("place_id", placeId);
-
-    if (deleteAccessError) {
-      alert(deleteAccessError.message);
-      setSaving(false);
-      return;
-    }
-
-    const accessRows = selectedStations
-      .filter((station) => station.station_id)
-      .map((station, index) => ({
-        place_id: placeId,
-        station_id: Number(station.station_id),
-        station_exit: station.station_exit || null,
-        walk_minutes: station.walk_minutes
-          ? Number(station.walk_minutes)
-          : null,
-        sort_order: index,
-      }));
-
-    if (accessRows.length > 0) {
-      const { error: accessError } = await supabase
-        .from("place_access")
-        .insert(accessRows);
-
-      if (accessError) {
-        alert(accessError.message);
-        setSaving(false);
-        return;
+        setLatitude(null);
+        setLongitude(null);
       }
+
+      const { error: placeError } =
+        await supabase
+          .from("places")
+          .update({
+            place_type_id: placeTypeId
+              ? Number(placeTypeId)
+              : null,
+
+            region_id: regionId
+              ? Number(regionId)
+              : null,
+
+            area_id: areaId
+              ? Number(areaId)
+              : null,
+
+            name: name.trim(),
+
+            description:
+              description || null,
+
+            editor_note:
+              editorNote || null,
+
+            postal_code:
+              postalCode || null,
+
+            address:
+              address || null,
+
+            latitude: nextLatitude,
+            longitude: nextLongitude,
+
+            phone:
+              phone || null,
+
+            price_range:
+              priceRange || null,
+
+            seats: seats
+              ? Number(seats)
+              : null,
+
+            counter_seats:
+              counterSeats
+                ? Number(counterSeats)
+                : null,
+
+            table_seats:
+              tableSeats
+                ? Number(tableSeats)
+                : null,
+
+            reservation:
+              reservation || null,
+
+            english_support:
+              englishSupport || null,
+
+            card,
+            tax_free: taxFree,
+
+            opening_hours:
+              openingHours || null,
+
+            closed_days:
+              closedDays || null,
+
+            official_url:
+              officialUrl || null,
+
+            instagram_url:
+              instagramUrl || null,
+
+            tabelog_url:
+              tabelogUrl || null,
+
+            google_maps_url:
+              googleMapsUrl || null,
+
+            image_url:
+              imageUrl || null,
+
+            status,
+
+            updated_at:
+              new Date().toISOString(),
+          })
+          .eq("id", placeId);
+
+      if (placeError) {
+        throw new Error(
+          placeError.message
+        );
+      }
+
+      const {
+        error: deleteAccessError,
+      } = await supabase
+        .from("place_access")
+        .delete()
+        .eq("place_id", placeId);
+
+      if (deleteAccessError) {
+        throw new Error(
+          deleteAccessError.message
+        );
+      }
+
+      const accessRows =
+        selectedStations
+          .filter(
+            (station) =>
+              station.station_id
+          )
+          .map((station, index) => ({
+            place_id: placeId,
+            station_id: Number(
+              station.station_id
+            ),
+            station_exit:
+              station.station_exit ||
+              null,
+            walk_minutes:
+              station.walk_minutes
+                ? Number(
+                    station.walk_minutes
+                  )
+                : null,
+            sort_order: index,
+          }));
+
+      if (accessRows.length > 0) {
+        const {
+          error: accessError,
+        } = await supabase
+          .from("place_access")
+          .insert(accessRows);
+
+        if (accessError) {
+          throw new Error(
+            accessError.message
+          );
+        }
+      }
+
+      setSaving(false);
+
+      alert("Saved successfully.");
+
+      router.push("/admin/places");
+      router.refresh();
+    } catch (error) {
+      alert(
+        error instanceof Error
+          ? error.message
+          : "Something went wrong."
+      );
+
+      setSaving(false);
     }
-
-    setSaving(false);
-
-    alert("Saved successfully.");
-    router.push("/admin/places");
-    router.refresh();
   }
 
   async function handleDelete() {
-    const confirmed = window.confirm(
-      "Delete this place? This cannot be undone."
-    );
+    const confirmed =
+      window.confirm(
+        "Delete this place? This cannot be undone."
+      );
 
     if (!confirmed) return;
 
     setDeleting(true);
 
-    const { error } = await supabase
-      .from("places")
-      .delete()
-      .eq("id", placeId);
+    const { error } =
+      await supabase
+        .from("places")
+        .delete()
+        .eq("id", placeId);
 
     if (error) {
       alert(error.message);
@@ -414,7 +602,8 @@ export default function EditPlacePage() {
       <div
         style={{
           display: "flex",
-          justifyContent: "space-between",
+          justifyContent:
+            "space-between",
           alignItems: "center",
           gap: "20px",
           marginBottom: "32px",
@@ -423,14 +612,20 @@ export default function EditPlacePage() {
         <div>
           <button
             type="button"
-            onClick={() => router.push("/admin/places")}
+            onClick={() =>
+              router.push(
+                "/admin/places"
+              )
+            }
             style={{
               border: "none",
-              background: "transparent",
+              background:
+                "transparent",
               padding: 0,
               cursor: "pointer",
               color: "#666",
-              marginBottom: "12px",
+              marginBottom:
+                "12px",
             }}
           >
             ← Back to Places
@@ -447,14 +642,17 @@ export default function EditPlacePage() {
           disabled={deleting}
           style={{
             padding: "10px 16px",
-            border: "1px solid #d33",
+            border:
+              "1px solid #d33",
             background: "#fff",
             color: "#d33",
             borderRadius: "8px",
             cursor: "pointer",
           }}
         >
-          {deleting ? "Deleting..." : "Delete"}
+          {deleting
+            ? "Deleting..."
+            : "Delete"}
         </button>
       </div>
 
@@ -463,7 +661,11 @@ export default function EditPlacePage() {
           <Field label="Place Name *">
             <input
               value={name}
-              onChange={(e) => setName(e.target.value)}
+              onChange={(e) =>
+                setName(
+                  e.target.value
+                )
+              }
               required
             />
           </Field>
@@ -471,15 +673,26 @@ export default function EditPlacePage() {
           <Field label="Type">
             <select
               value={placeTypeId}
-              onChange={(e) => setPlaceTypeId(e.target.value)}
+              onChange={(e) =>
+                setPlaceTypeId(
+                  e.target.value
+                )
+              }
             >
-              <option value="">Select type</option>
+              <option value="">
+                Select type
+              </option>
 
-              {placeTypes.map((type) => (
-                <option key={type.id} value={type.id}>
-                  {type.name}
-                </option>
-              ))}
+              {placeTypes.map(
+                (type) => (
+                  <option
+                    key={type.id}
+                    value={type.id}
+                  >
+                    {type.name}
+                  </option>
+                )
+              )}
             </select>
           </Field>
 
@@ -487,40 +700,68 @@ export default function EditPlacePage() {
             <select
               value={regionId}
               onChange={(e) => {
-                setRegionId(e.target.value);
+                setRegionId(
+                  e.target.value
+                );
                 setAreaId("");
               }}
             >
-              <option value="">Select region</option>
+              <option value="">
+                Select region
+              </option>
 
-              {regions.map((region) => (
-                <option key={region.id} value={region.id}>
-                  {region.name}
-                </option>
-              ))}
+              {regions.map(
+                (region) => (
+                  <option
+                    key={region.id}
+                    value={
+                      region.id
+                    }
+                  >
+                    {region.name}
+                  </option>
+                )
+              )}
             </select>
           </Field>
 
           <Field label="Area">
             <select
               value={areaId}
-              onChange={(e) => setAreaId(e.target.value)}
+              onChange={(e) =>
+                setAreaId(
+                  e.target.value
+                )
+              }
               disabled={!regionId}
             >
-              <option value="">Select area</option>
+              <option value="">
+                Select area
+              </option>
 
-              {filteredAreas.map((area) => (
-                <option key={area.id} value={area.id}>
-                  {area.name}
-                </option>
-              ))}
+              {filteredAreas.map(
+                (area) => (
+                  <option
+                    key={area.id}
+                    value={
+                      area.id
+                    }
+                  >
+                    {area.name}
+                  </option>
+                )
+              )}
             </select>
           </Field>
 
           <Field label="Description">
             <textarea
               value={description}
-              onChange={(e) => setDescription(e.target.value)}
+              onChange={(e) =>
+                setDescription(
+                  e.target.value
+                )
+              }
               rows={5}
             />
           </Field>
@@ -528,7 +769,11 @@ export default function EditPlacePage() {
           <Field label="Editor Note">
             <textarea
               value={editorNote}
-              onChange={(e) => setEditorNote(e.target.value)}
+              onChange={(e) =>
+                setEditorNote(
+                  e.target.value
+                )
+              }
               rows={4}
             />
           </Field>
@@ -538,98 +783,167 @@ export default function EditPlacePage() {
           <Field label="Postal Code">
             <input
               value={postalCode}
-              onChange={(e) => setPostalCode(e.target.value)}
+              onChange={(e) =>
+                setPostalCode(
+                  e.target.value
+                )
+              }
             />
           </Field>
 
           <Field label="Address">
             <input
               value={address}
-              onChange={(e) => setAddress(e.target.value)}
+              onChange={(e) =>
+                setAddress(
+                  e.target.value
+                )
+              }
+              placeholder="Full address"
             />
           </Field>
 
           <Field label="Google Maps URL">
             <input
               type="url"
-              value={googleMapsUrl}
-              onChange={(e) => setGoogleMapsUrl(e.target.value)}
+              value={
+                googleMapsUrl
+              }
+              onChange={(e) =>
+                setGoogleMapsUrl(
+                  e.target.value
+                )
+              }
             />
           </Field>
+
+          {latitude !== null &&
+            longitude !== null && (
+              <div
+                style={{
+                  marginTop:
+                    "12px",
+                  padding: "12px 14px",
+                  background:
+                    "#f7f7f7",
+                  borderRadius:
+                    "8px",
+                  fontSize:
+                    "13px",
+                  color: "#666",
+                }}
+              >
+                Map coordinates:
+                {" "}
+                {latitude.toFixed(
+                  6
+                )}
+                {" / "}
+                {longitude.toFixed(
+                  6
+                )}
+              </div>
+            )}
         </Section>
 
         <Section title="Access / Nearest Station">
-          {selectedStations.map((station, index) => (
-            <div
-              key={index}
-              style={{
-                border: "1px solid #ddd",
-                padding: "16px",
-                borderRadius: "8px",
-                marginBottom: "12px",
-              }}
-            >
-              <Field label="Station">
-                <select
-                  value={station.station_id}
-                  onChange={(e) =>
-                    updateStation(
-                      index,
-                      "station_id",
-                      e.target.value
+          {selectedStations.map(
+            (station, index) => (
+              <div
+                key={index}
+                style={{
+                  border:
+                    "1px solid #ddd",
+                  padding: "16px",
+                  borderRadius:
+                    "8px",
+                  marginBottom:
+                    "12px",
+                }}
+              >
+                <Field label="Station">
+                  <select
+                    value={
+                      station.station_id
+                    }
+                    onChange={(e) =>
+                      updateStation(
+                        index,
+                        "station_id",
+                        e.target.value
+                      )
+                    }
+                  >
+                    <option value="">
+                      Select station
+                    </option>
+
+                    {stations.map(
+                      (s) => (
+                        <option
+                          key={s.id}
+                          value={
+                            s.id
+                          }
+                        >
+                          {s.name}
+                        </option>
+                      )
+                    )}
+                  </select>
+                </Field>
+
+                <Field label="Exit">
+                  <input
+                    value={
+                      station.station_exit
+                    }
+                    onChange={(e) =>
+                      updateStation(
+                        index,
+                        "station_exit",
+                        e.target.value
+                      )
+                    }
+                  />
+                </Field>
+
+                <Field label="Walk Minutes">
+                  <input
+                    type="number"
+                    min="0"
+                    value={
+                      station.walk_minutes
+                    }
+                    onChange={(e) =>
+                      updateStation(
+                        index,
+                        "walk_minutes",
+                        e.target.value
+                      )
+                    }
+                  />
+                </Field>
+
+                <button
+                  type="button"
+                  onClick={() =>
+                    removeStation(
+                      index
                     )
                   }
                 >
-                  <option value="">Select station</option>
-
-                  {stations.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.name}
-                    </option>
-                  ))}
-                </select>
-              </Field>
-
-              <Field label="Exit">
-                <input
-                  value={station.station_exit}
-                  onChange={(e) =>
-                    updateStation(
-                      index,
-                      "station_exit",
-                      e.target.value
-                    )
-                  }
-                />
-              </Field>
-
-              <Field label="Walk Minutes">
-                <input
-                  type="number"
-                  min="0"
-                  value={station.walk_minutes}
-                  onChange={(e) =>
-                    updateStation(
-                      index,
-                      "walk_minutes",
-                      e.target.value
-                    )
-                  }
-                />
-              </Field>
-
-              <button
-                type="button"
-                onClick={() => removeStation(index)}
-              >
-                Remove Station
-              </button>
-            </div>
-          ))}
+                  Remove Station
+                </button>
+              </div>
+            )
+          )}
 
           <button
             type="button"
-            onClick={addStation}
+            onClick={
+              addStation
+            }
           >
             + Add Station
           </button>
@@ -639,31 +953,53 @@ export default function EditPlacePage() {
           <Field label="Phone">
             <input
               value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              onChange={(e) =>
+                setPhone(
+                  e.target.value
+                )
+              }
             />
           </Field>
 
           <Field label="Official Website">
             <input
               type="url"
-              value={officialUrl}
-              onChange={(e) => setOfficialUrl(e.target.value)}
+              value={
+                officialUrl
+              }
+              onChange={(e) =>
+                setOfficialUrl(
+                  e.target.value
+                )
+              }
             />
           </Field>
 
           <Field label="Instagram">
             <input
               type="url"
-              value={instagramUrl}
-              onChange={(e) => setInstagramUrl(e.target.value)}
+              value={
+                instagramUrl
+              }
+              onChange={(e) =>
+                setInstagramUrl(
+                  e.target.value
+                )
+              }
             />
           </Field>
 
           <Field label="Tabelog">
             <input
               type="url"
-              value={tabelogUrl}
-              onChange={(e) => setTabelogUrl(e.target.value)}
+              value={
+                tabelogUrl
+              }
+              onChange={(e) =>
+                setTabelogUrl(
+                  e.target.value
+                )
+              }
             />
           </Field>
         </Section>
@@ -672,7 +1008,11 @@ export default function EditPlacePage() {
           <Field label="Price Range">
             <input
               value={priceRange}
-              onChange={(e) => setPriceRange(e.target.value)}
+              onChange={(e) =>
+                setPriceRange(
+                  e.target.value
+                )
+              }
             />
           </Field>
 
@@ -681,7 +1021,11 @@ export default function EditPlacePage() {
               type="number"
               min="0"
               value={seats}
-              onChange={(e) => setSeats(e.target.value)}
+              onChange={(e) =>
+                setSeats(
+                  e.target.value
+                )
+              }
             />
           </Field>
 
@@ -689,8 +1033,14 @@ export default function EditPlacePage() {
             <input
               type="number"
               min="0"
-              value={counterSeats}
-              onChange={(e) => setCounterSeats(e.target.value)}
+              value={
+                counterSeats
+              }
+              onChange={(e) =>
+                setCounterSeats(
+                  e.target.value
+                )
+              }
             />
           </Field>
 
@@ -698,51 +1048,81 @@ export default function EditPlacePage() {
             <input
               type="number"
               min="0"
-              value={tableSeats}
-              onChange={(e) => setTableSeats(e.target.value)}
+              value={
+                tableSeats
+              }
+              onChange={(e) =>
+                setTableSeats(
+                  e.target.value
+                )
+              }
             />
           </Field>
 
           <Field label="Reservation">
             <input
-              value={reservation}
-              onChange={(e) => setReservation(e.target.value)}
+              value={
+                reservation
+              }
+              onChange={(e) =>
+                setReservation(
+                  e.target.value
+                )
+              }
             />
           </Field>
 
           <Field label="English Support">
             <input
-              value={englishSupport}
-              onChange={(e) => setEnglishSupport(e.target.value)}
+              value={
+                englishSupport
+              }
+              onChange={(e) =>
+                setEnglishSupport(
+                  e.target.value
+                )
+              }
             />
           </Field>
 
           <label
             style={{
-              display: "flex",
+              display:
+                "flex",
               gap: "8px",
-              marginTop: "16px",
+              marginTop:
+                "16px",
             }}
           >
             <input
               type="checkbox"
               checked={card}
-              onChange={(e) => setCard(e.target.checked)}
+              onChange={(e) =>
+                setCard(
+                  e.target.checked
+                )
+              }
             />
             Credit Cards Accepted
           </label>
 
           <label
             style={{
-              display: "flex",
+              display:
+                "flex",
               gap: "8px",
-              marginTop: "12px",
+              marginTop:
+                "12px",
             }}
           >
             <input
               type="checkbox"
               checked={taxFree}
-              onChange={(e) => setTaxFree(e.target.checked)}
+              onChange={(e) =>
+                setTaxFree(
+                  e.target.checked
+                )
+              }
             />
             Tax Free
           </label>
@@ -751,16 +1131,28 @@ export default function EditPlacePage() {
         <Section title="Opening Hours">
           <Field label="Opening Hours">
             <textarea
-              value={openingHours}
-              onChange={(e) => setOpeningHours(e.target.value)}
+              value={
+                openingHours
+              }
+              onChange={(e) =>
+                setOpeningHours(
+                  e.target.value
+                )
+              }
               rows={4}
             />
           </Field>
 
           <Field label="Closed Days">
             <input
-              value={closedDays}
-              onChange={(e) => setClosedDays(e.target.value)}
+              value={
+                closedDays
+              }
+              onChange={(e) =>
+                setClosedDays(
+                  e.target.value
+                )
+              }
             />
           </Field>
         </Section>
@@ -770,7 +1162,11 @@ export default function EditPlacePage() {
             <input
               type="url"
               value={imageUrl}
-              onChange={(e) => setImageUrl(e.target.value)}
+              onChange={(e) =>
+                setImageUrl(
+                  e.target.value
+                )
+              }
             />
           </Field>
 
@@ -779,10 +1175,14 @@ export default function EditPlacePage() {
               src={imageUrl}
               alt={name}
               style={{
-                width: "100%",
-                maxWidth: "400px",
-                marginTop: "12px",
-                borderRadius: "8px",
+                width:
+                  "100%",
+                maxWidth:
+                  "400px",
+                marginTop:
+                  "12px",
+                borderRadius:
+                  "8px",
               }}
             />
           )}
@@ -791,12 +1191,27 @@ export default function EditPlacePage() {
         <Section title="Status">
           <select
             value={status}
-            onChange={(e) => setStatus(e.target.value)}
+            onChange={(e) =>
+              setStatus(
+                e.target.value
+              )
+            }
           >
-            <option value="draft">Draft</option>
-            <option value="published">Published</option>
-            <option value="hidden">Hidden</option>
-            <option value="archived">Archived</option>
+            <option value="draft">
+              Draft
+            </option>
+
+            <option value="published">
+              Published
+            </option>
+
+            <option value="hidden">
+              Hidden
+            </option>
+
+            <option value="archived">
+              Archived
+            </option>
           </select>
         </Section>
 
@@ -812,10 +1227,13 @@ export default function EditPlacePage() {
             borderRadius: "8px",
             fontSize: "16px",
             cursor: "pointer",
-            marginTop: "20px",
+            marginTop:
+              "20px",
           }}
         >
-          {saving ? "Saving..." : "Save Changes"}
+          {saving
+            ? "Saving..."
+            : "Save Changes"}
         </button>
       </form>
     </main>
@@ -832,10 +1250,13 @@ function Section({
   return (
     <section
       style={{
-        marginBottom: "32px",
+        marginBottom:
+          "32px",
         padding: "24px",
-        border: "1px solid #e5e5e5",
-        borderRadius: "12px",
+        border:
+          "1px solid #e5e5e5",
+        borderRadius:
+          "12px",
       }}
     >
       <h2
@@ -860,18 +1281,29 @@ function Field({
   children: React.ReactNode;
 }) {
   return (
-    <div style={{ marginBottom: "18px" }}>
+    <div
+      style={{
+        marginBottom:
+          "18px",
+      }}
+    >
       <label
         style={{
-          display: "block",
-          marginBottom: "7px",
+          display:
+            "block",
+          marginBottom:
+            "7px",
           fontWeight: 600,
         }}
       >
         {label}
       </label>
 
-      <div style={{ width: "100%" }}>
+      <div
+        style={{
+          width: "100%",
+        }}
+      >
         {children}
       </div>
     </div>

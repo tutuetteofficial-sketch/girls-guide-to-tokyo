@@ -7,30 +7,39 @@ type Place = {
   id: string;
   name: string;
   description: string | null;
-  region_id: number | null;
-  area_id: number | null;
-  group_id: string | null;
+  place_type_id: string | null;
+  area_id: string | null;
   price_range: string | null;
   editor_note: string | null;
-};
 
-type Region = {
-  id: number;
-  name: string;
+  postal_code: string | null;
+  address: string | null;
+  google_maps_url: string | null;
+
+  phone: string | null;
+  official_url: string | null;
+  instagram_url: string | null;
+  tabelog_url: string | null;
+
+  reservation: string | null;
+  english_support: string | null;
+  opening_hours: string | null;
+  closed_days: string | null;
+
+  seats: string | null;
+  counter_seats: string | null;
+  table_seats: string | null;
+
+  card: string | null;
+  tax_free: string | null;
+
+  image_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 type Area = {
-  id: number;
-  name: string;
-};
-
-type PlaceGroup = {
   id: string;
-  name: string;
-};
-
-type PlaceCategory = {
-  id: number;
   name: string;
 };
 
@@ -53,13 +62,50 @@ type PlaceProductRelation = {
   product_id: string;
 };
 
+type Station = {
+  id: string;
+  name: string;
+};
+
+type PlaceAccess = {
+  station_id: string;
+  walk_minutes: number | null;
+};
+
+type AccessWithStation = PlaceAccess & {
+  station: Station | null;
+};
+
+type SupabaseErrorInfo = {
+  message: string;
+  details: string;
+  hint: string;
+  code: string;
+};
+
 export default async function PlaceDetailPage({
   params,
 }: {
   params: Promise<{ id: string }>;
 }) {
-  const { id } = await params;
+const { id } = await params;
 
+const uuidRegex =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+if (
+  !id ||
+  !uuidRegex.test(id)
+) {
+  notFound();
+}
+
+  /*
+   * places
+   *
+   * 現在のAdmin入力画面と同じDB構造を使用。
+   * 以前存在していた region_id / group_id は使用しない。
+   */
   const {
     data: placeData,
     error: placeError,
@@ -69,29 +115,150 @@ export default async function PlaceDetailPage({
       id,
       name,
       description,
-      region_id,
+      place_type_id,
       area_id,
-      group_id,
       price_range,
-      editor_note
+      editor_note,
+      postal_code,
+      address,
+      google_maps_url,
+      phone,
+      official_url,
+      instagram_url,
+      tabelog_url,
+      reservation,
+      english_support,
+      opening_hours,
+      closed_days,
+      seats,
+      counter_seats,
+      table_seats,
+      card,
+      tax_free,
+      image_url,
+      latitude,
+      longitude
     `)
     .eq("id", id)
     .eq("status", "published")
-    .single();
+    .maybeSingle();
 
-  if (placeError || !placeData) {
+  if (placeError) {
+    const errorInfo: SupabaseErrorInfo = {
+      message: placeError.message ?? "",
+      details: placeError.details ?? "",
+      hint: placeError.hint ?? "",
+      code: placeError.code ?? "",
+    };
+
+    console.error(
+      "PLACE DETAIL SUPABASE ERROR:",
+      errorInfo
+    );
+
+    return (
+      <main
+        style={{
+          minHeight: "100vh",
+          padding: "60px 24px",
+          background: "#fffaf8",
+          color: "#222",
+        }}
+      >
+        <div
+          style={{
+            maxWidth: "800px",
+            margin: "0 auto",
+            background: "#fff",
+            border: "1px solid #e5ddd9",
+            borderRadius: "16px",
+            padding: "30px",
+          }}
+        >
+          <h1
+            style={{
+              fontFamily: "Georgia, serif",
+              fontWeight: 400,
+              fontSize: "30px",
+              margin: 0,
+            }}
+          >
+            Place could not be loaded
+          </h1>
+
+          <div
+            style={{
+              marginTop: "20px",
+              color: "#c8647b",
+              fontSize: "14px",
+              lineHeight: 1.7,
+              wordBreak: "break-word",
+            }}
+          >
+            <p>
+              <strong>Message:</strong>{" "}
+              {errorInfo.message || "(empty)"}
+            </p>
+
+            <p>
+              <strong>Details:</strong>{" "}
+              {errorInfo.details || "(empty)"}
+            </p>
+
+            <p>
+              <strong>Hint:</strong>{" "}
+              {errorInfo.hint || "(empty)"}
+            </p>
+
+            <p>
+              <strong>Code:</strong>{" "}
+              {errorInfo.code || "(empty)"}
+            </p>
+          </div>
+
+          <p
+            style={{
+              marginTop: "20px",
+              color: "#777",
+              fontSize: "12px",
+              lineHeight: 1.7,
+              wordBreak: "break-word",
+            }}
+          >
+            Place ID: {id}
+          </p>
+
+          <Link
+            href="/places"
+            style={{
+              display: "inline-block",
+              marginTop: "25px",
+              color: "#c8647b",
+              textDecoration: "none",
+              fontSize: "12px",
+            }}
+          >
+            ← Back to Places
+          </Link>
+        </div>
+      </main>
+    );
+  }
+
+  if (!placeData) {
     notFound();
   }
 
   const place = placeData as Place;
 
+  /*
+   * 関連データを取得
+   */
   const [
     imagesResult,
-    categoriesResult,
-    regionResult,
     areaResult,
-    groupResult,
     productRelationsResult,
+    accessResult,
   ] = await Promise.all([
     supabase
       .from("place_images")
@@ -103,45 +270,12 @@ export default async function PlaceDetailPage({
       .eq("place_id", place.id)
       .order("sort_order"),
 
-    supabase
-      .from("place_category_relations")
-      .select(`
-        category_id,
-        place_categories (
-          id,
-          name
-        )
-      `)
-      .eq("place_id", place.id),
-
-    place.region_id !== null
-      ? supabase
-          .from("regions")
-          .select("id, name")
-          .eq("id", place.region_id)
-          .single()
-      : Promise.resolve({
-          data: null,
-          error: null,
-        }),
-
-    place.area_id !== null
+    place.area_id
       ? supabase
           .from("areas")
           .select("id, name")
           .eq("id", place.area_id)
-          .single()
-      : Promise.resolve({
-          data: null,
-          error: null,
-        }),
-
-    place.group_id
-      ? supabase
-          .from("place_groups")
-          .select("id, name")
-          .eq("id", place.group_id)
-          .single()
+          .maybeSingle()
       : Promise.resolve({
           data: null,
           error: null,
@@ -152,30 +286,79 @@ export default async function PlaceDetailPage({
       .select("product_id")
       .eq("place_id", place.id)
       .eq("available", true),
+
+    supabase
+      .from("place_access")
+      .select(`
+        station_id,
+        walk_minutes
+      `)
+      .eq("place_id", place.id),
   ]);
+
+  /*
+   * Images
+   */
+  if (imagesResult.error) {
+    console.error(
+      "PLACE IMAGES SUPABASE ERROR:",
+      {
+        message:
+          imagesResult.error.message ?? "",
+        details:
+          imagesResult.error.details ?? "",
+        hint:
+          imagesResult.error.hint ?? "",
+        code:
+          imagesResult.error.code ?? "",
+      }
+    );
+  }
 
   const images =
     (imagesResult.data ?? []) as PlaceImage[];
 
-  const region = regionResult.data
-    ? (regionResult.data as Region)
-    : null;
+  /*
+   * Area
+   */
+  if (areaResult.error) {
+    console.error(
+      "PLACE AREA SUPABASE ERROR:",
+      {
+        message:
+          areaResult.error.message ?? "",
+        details:
+          areaResult.error.details ?? "",
+        hint:
+          areaResult.error.hint ?? "",
+        code:
+          areaResult.error.code ?? "",
+      }
+    );
+  }
 
   const area = areaResult.data
     ? (areaResult.data as Area)
     : null;
 
-  const group = groupResult.data
-    ? (groupResult.data as PlaceGroup)
-    : null;
-
-  const categories =
-    ((categoriesResult.data ?? [])
-      .map(
-        (item: any) =>
-          item.place_categories
-      )
-      .filter(Boolean) ?? []) as PlaceCategory[];
+  /*
+   * Products
+   */
+  if (productRelationsResult.error) {
+    console.error(
+      "PLACE PRODUCTS SUPABASE ERROR:",
+      {
+        message:
+          productRelationsResult.error.message ?? "",
+        details:
+          productRelationsResult.error.details ?? "",
+        hint:
+          productRelationsResult.error.hint ?? "",
+        code:
+          productRelationsResult.error.code ?? "",
+      }
+    );
+  }
 
   const productRelations =
     (productRelationsResult.data ??
@@ -195,6 +378,7 @@ export default async function PlaceDetailPage({
   if (productIds.length > 0) {
     const {
       data: productsData,
+      error: productsError,
     } = await supabase
       .from("products")
       .select(`
@@ -209,8 +393,98 @@ export default async function PlaceDetailPage({
       .eq("status", "published")
       .order("name");
 
+    if (productsError) {
+      console.error(
+        "PRODUCTS SUPABASE ERROR:",
+        {
+          message:
+            productsError.message ?? "",
+          details:
+            productsError.details ?? "",
+          hint:
+            productsError.hint ?? "",
+          code:
+            productsError.code ?? "",
+        }
+      );
+    }
+
     products =
       (productsData ?? []) as Product[];
+  }
+
+  /*
+   * Access
+   */
+  if (accessResult.error) {
+    console.error(
+      "PLACE ACCESS SUPABASE ERROR:",
+      {
+        message:
+          accessResult.error.message ?? "",
+        details:
+          accessResult.error.details ?? "",
+        hint:
+          accessResult.error.hint ?? "",
+        code:
+          accessResult.error.code ?? "",
+      }
+    );
+  }
+
+  const rawAccess =
+    (accessResult.data ??
+      []) as PlaceAccess[];
+
+  let access: AccessWithStation[] = [];
+
+  const stationIds = [
+    ...new Set(
+      rawAccess.map(
+        (row) => row.station_id
+      )
+    ),
+  ];
+
+  if (stationIds.length > 0) {
+    const {
+      data: stationsData,
+      error: stationsError,
+    } = await supabase
+      .from("stations")
+      .select("id, name")
+      .in("id", stationIds);
+
+    if (stationsError) {
+      console.error(
+        "STATIONS SUPABASE ERROR:",
+        {
+          message:
+            stationsError.message ?? "",
+          details:
+            stationsError.details ?? "",
+          hint:
+            stationsError.hint ?? "",
+          code:
+            stationsError.code ?? "",
+        }
+      );
+    }
+
+    const stations =
+      (stationsData ?? []) as Station[];
+
+    access = rawAccess.map(
+      (row) => ({
+        ...row,
+        station:
+          stations.find(
+            (station) =>
+              station.id ===
+              row.station_id
+          ) ?? null,
+      })
+    );
   }
 
   return (
@@ -233,35 +507,26 @@ export default async function PlaceDetailPage({
                 alt={place.name}
                 style={styles.heroImage}
               />
+            ) : place.image_url ? (
+              <img
+                src={place.image_url}
+                alt={place.name}
+                style={styles.heroImage}
+              />
             ) : (
-              <div style={styles.placeholder}>
+              <div
+                style={styles.placeholder}
+              >
                 TOKYO GUIDE
               </div>
             )}
           </div>
 
           <div style={styles.infoArea}>
-            {group && (
+            {place.place_type_id && (
               <p style={styles.group}>
-                {group.name}
+                {area?.name ?? ""}
               </p>
-            )}
-
-            {categories.length > 0 && (
-              <div style={styles.categories}>
-                {categories.map(
-                  (category) => (
-                    <span
-                      key={category.id}
-                      style={
-                        styles.category
-                      }
-                    >
-                      {category.name}
-                    </span>
-                  )
-                )}
-              </div>
             )}
 
             <h1 style={styles.title}>
@@ -275,13 +540,9 @@ export default async function PlaceDetailPage({
               />
             </div>
 
-            {(region || area) && (
+            {area && (
               <p style={styles.location}>
-                {region?.name ?? ""}
-                {region && area
-                  ? " / "
-                  : ""}
-                {area?.name ?? ""}
+                {area.name}
               </p>
             )}
 
@@ -318,6 +579,418 @@ export default async function PlaceDetailPage({
             )}
           </div>
         </section>
+
+        {(place.postal_code ||
+          place.address ||
+          place.google_maps_url) && (
+          <section style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <div>
+                <p
+                  style={
+                    styles.sectionEyebrow
+                  }
+                >
+                  WHERE TO FIND IT
+                </p>
+
+                <h2
+                  style={styles.sectionTitle}
+                >
+                  Location
+                </h2>
+              </div>
+            </div>
+
+            <div style={styles.detailGrid}>
+              {place.postal_code && (
+                <div style={styles.detailItem}>
+                  <p
+                    style={
+                      styles.detailLabel
+                    }
+                  >
+                    POSTAL CODE
+                  </p>
+
+                  <p
+                    style={
+                      styles.detailText
+                    }
+                  >
+                    {place.postal_code}
+                  </p>
+                </div>
+              )}
+
+              {place.address && (
+                <div style={styles.detailItem}>
+                  <p
+                    style={
+                      styles.detailLabel
+                    }
+                  >
+                    ADDRESS
+                  </p>
+
+                  <p
+                    style={
+                      styles.detailText
+                    }
+                  >
+                    {place.address}
+                  </p>
+                </div>
+              )}
+
+              {place.google_maps_url && (
+                <div style={styles.detailItem}>
+                  <a
+                    href={
+                      place.google_maps_url
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    style={styles.externalLink}
+                  >
+                    Open in Google Maps →
+                  </a>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {access.length > 0 && (
+          <section style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <div>
+                <p
+                  style={
+                    styles.sectionEyebrow
+                  }
+                >
+                  GETTING THERE
+                </p>
+
+                <h2
+                  style={styles.sectionTitle}
+                >
+                  Access
+                </h2>
+              </div>
+            </div>
+
+            <div style={styles.accessList}>
+              {access.map((row, index) => (
+                <div
+                  key={`${row.station_id}-${index}`}
+                  style={styles.accessRow}
+                >
+                  <span
+                    style={
+                      styles.accessStation
+                    }
+                  >
+                    {row.station?.name ??
+                      "Station"}
+                  </span>
+
+                  {row.walk_minutes !==
+                    null && (
+                    <span
+                      style={
+                        styles.accessWalk
+                      }
+                    >
+                      {row.walk_minutes} min
+                      walk
+                    </span>
+                  )}
+                </div>
+              ))}
+            </div>
+          </section>
+        )}
+
+        {(place.opening_hours ||
+          place.closed_days ||
+          place.reservation ||
+          place.english_support ||
+          place.seats ||
+          place.counter_seats ||
+          place.table_seats ||
+          place.card ||
+          place.tax_free ||
+          place.phone ||
+          place.official_url ||
+          place.instagram_url ||
+          place.tabelog_url) && (
+          <section style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <div>
+                <p
+                  style={
+                    styles.sectionEyebrow
+                  }
+                >
+                  GOOD TO KNOW
+                </p>
+
+                <h2
+                  style={styles.sectionTitle}
+                >
+                  Information
+                </h2>
+              </div>
+            </div>
+
+            <div style={styles.detailGrid}>
+              {place.opening_hours && (
+                <div style={styles.detailItem}>
+                  <p
+                    style={
+                      styles.detailLabel
+                    }
+                  >
+                    OPENING HOURS
+                  </p>
+
+                  <p
+                    style={{
+                      ...styles.detailText,
+                      whiteSpace:
+                        "pre-line",
+                    }}
+                  >
+                    {place.opening_hours}
+                  </p>
+                </div>
+              )}
+
+              {place.closed_days && (
+                <div style={styles.detailItem}>
+                  <p
+                    style={
+                      styles.detailLabel
+                    }
+                  >
+                    CLOSED DAYS
+                  </p>
+
+                  <p
+                    style={
+                      styles.detailText
+                    }
+                  >
+                    {place.closed_days}
+                  </p>
+                </div>
+              )}
+
+              {place.reservation && (
+                <div style={styles.detailItem}>
+                  <p
+                    style={
+                      styles.detailLabel
+                    }
+                  >
+                    RESERVATION
+                  </p>
+
+                  <p
+                    style={
+                      styles.detailText
+                    }
+                  >
+                    {place.reservation}
+                  </p>
+                </div>
+              )}
+
+              {place.english_support && (
+                <div style={styles.detailItem}>
+                  <p
+                    style={
+                      styles.detailLabel
+                    }
+                  >
+                    ENGLISH SUPPORT
+                  </p>
+
+                  <p
+                    style={
+                      styles.detailText
+                    }
+                  >
+                    {place.english_support}
+                  </p>
+                </div>
+              )}
+
+              {place.seats && (
+                <div style={styles.detailItem}>
+                  <p
+                    style={
+                      styles.detailLabel
+                    }
+                  >
+                    TOTAL SEATS
+                  </p>
+
+                  <p
+                    style={
+                      styles.detailText
+                    }
+                  >
+                    {place.seats}
+                  </p>
+                </div>
+              )}
+
+              {place.counter_seats && (
+                <div style={styles.detailItem}>
+                  <p
+                    style={
+                      styles.detailLabel
+                    }
+                  >
+                    COUNTER SEATS
+                  </p>
+
+                  <p
+                    style={
+                      styles.detailText
+                    }
+                  >
+                    {place.counter_seats}
+                  </p>
+                </div>
+              )}
+
+              {place.table_seats && (
+                <div style={styles.detailItem}>
+                  <p
+                    style={
+                      styles.detailLabel
+                    }
+                  >
+                    TABLE SEATS
+                  </p>
+
+                  <p
+                    style={
+                      styles.detailText
+                    }
+                  >
+                    {place.table_seats}
+                  </p>
+                </div>
+              )}
+
+              {place.card && (
+                <div style={styles.detailItem}>
+                  <p
+                    style={
+                      styles.detailLabel
+                    }
+                  >
+                    CARD
+                  </p>
+
+                  <p
+                    style={
+                      styles.detailText
+                    }
+                  >
+                    {place.card}
+                  </p>
+                </div>
+              )}
+
+              {place.tax_free && (
+                <div style={styles.detailItem}>
+                  <p
+                    style={
+                      styles.detailLabel
+                    }
+                  >
+                    TAX FREE
+                  </p>
+
+                  <p
+                    style={
+                      styles.detailText
+                    }
+                  >
+                    {place.tax_free}
+                  </p>
+                </div>
+              )}
+
+              {place.phone && (
+                <div style={styles.detailItem}>
+                  <p
+                    style={
+                      styles.detailLabel
+                    }
+                  >
+                    PHONE
+                  </p>
+
+                  <p
+                    style={
+                      styles.detailText
+                    }
+                  >
+                    {place.phone}
+                  </p>
+                </div>
+              )}
+
+              {place.official_url && (
+                <div style={styles.detailItem}>
+                  <a
+                    href={place.official_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={styles.externalLink}
+                  >
+                    Official Website →
+                  </a>
+                </div>
+              )}
+
+              {place.instagram_url && (
+                <div style={styles.detailItem}>
+                  <a
+                    href={
+                      place.instagram_url
+                    }
+                    target="_blank"
+                    rel="noreferrer"
+                    style={styles.externalLink}
+                  >
+                    Instagram →
+                  </a>
+                </div>
+              )}
+
+              {place.tabelog_url && (
+                <div style={styles.detailItem}>
+                  <a
+                    href={place.tabelog_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    style={styles.externalLink}
+                  >
+                    Tabelog →
+                  </a>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
 
         {images.length > 1 && (
           <section style={styles.section}>
@@ -577,18 +1250,6 @@ const styles = {
       "uppercase" as const,
   },
 
-  categories: {
-    display: "flex",
-    flexWrap: "wrap" as const,
-    gap: "6px",
-    marginTop: "10px",
-  },
-
-  category: {
-    color: "#888",
-    fontSize: "10px",
-  },
-
   title: {
     fontFamily: "Georgia, serif",
     fontWeight: 400,
@@ -674,6 +1335,67 @@ const styles = {
     margin: "7px 0 0",
   },
 
+  detailGrid: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(2, minmax(0, 1fr))",
+    gap: "22px 40px",
+  },
+
+  detailItem: {
+    minWidth: 0,
+  },
+
+  detailLabel: {
+    color: "#c8647b",
+    fontSize: "9px",
+    fontWeight: 700,
+    letterSpacing: "1.5px",
+    margin: 0,
+  },
+
+  detailText: {
+    color: "#555",
+    fontSize: "13px",
+    lineHeight: 1.8,
+    margin: "7px 0 0",
+  },
+
+  externalLink: {
+    color: "#c8647b",
+    fontSize: "12px",
+    textDecoration: "none",
+  },
+
+  accessList: {
+    background: "#fff",
+    border:
+      "1px solid #e5ddd9",
+    borderRadius: "15px",
+    overflow: "hidden",
+  },
+
+  accessRow: {
+    display: "flex",
+    justifyContent:
+      "space-between",
+    alignItems: "center",
+    gap: "20px",
+    padding: "16px 18px",
+    borderBottom:
+      "1px solid #eee6e2",
+  },
+
+  accessStation: {
+    color: "#444",
+    fontSize: "13px",
+  },
+
+  accessWalk: {
+    color: "#999",
+    fontSize: "11px",
+  },
+
   count: {
     color: "#999",
     fontSize: "11px",
@@ -712,7 +1434,8 @@ const styles = {
     color: "#222",
     textDecoration: "none",
     background: "#fff",
-    border: "1px solid #e5ddd9",
+    border:
+      "1px solid #e5ddd9",
     borderRadius: "15px",
     overflow: "hidden",
   },
@@ -792,7 +1515,8 @@ const styles = {
   empty: {
     padding: "60px 20px",
     background: "#fff",
-    border: "1px solid #e7e0dc",
+    border:
+      "1px solid #e7e0dc",
     borderRadius: "15px",
     textAlign: "center" as const,
   },

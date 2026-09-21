@@ -1,1147 +1,1118 @@
-"use client";
-
 import Link from "next/link";
-import { useEffect, useState } from "react";
-import { useRouter } from "next/navigation";
+import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import SaveButton from "@/components/SaveButton";
 
-type PlaceType = {
-  id: number;
+type Place = {
+  id: string;
   name: string;
+  description: string | null;
+  place_type_id: string | null;
+  area_id: string | null;
+  price_range: string | null;
+  editor_note: string | null;
+
+  postal_code: string | null;
+  address: string | null;
+  google_maps_url: string | null;
+
+  phone: string | null;
+  official_url: string | null;
+  instagram_url: string | null;
+  tabelog_url: string | null;
+
+  reservation: string | null;
+  english_support: string | null;
+  opening_hours: string | null;
+  closed_days: string | null;
+  seats: string | null;
+  counter_seats: string | null;
+  table_seats: string | null;
+  card: string | null;
+  tax_free: string | null;
+
+  image_url: string | null;
+  latitude: number | null;
+  longitude: number | null;
 };
 
 type Area = {
-  id: number;
+  id: string;
   name: string;
 };
 
-type Station = {
-  id: number;
+type PlaceImage = {
+  id: string;
+  image_url: string;
+  sort_order: number;
+};
+
+type Product = {
+  id: string;
   name: string;
+  brand: string | null;
+  description: string | null;
+  image_url: string | null;
+  editor_pick: number | null;
 };
 
-type AccessRow = {
-  station_id: string;
-  station_name: string;
-  station_exit: string;
-  walk_minutes: string;
+type PlaceProductRelation = {
+  product_id: string;
 };
 
-export default function NewPlacePage() {
-  const router = useRouter();
+export default async function PlaceDetailPage({
+  params,
+}: {
+  params: Promise<{ id: string }>;
+}) {
+  const { id } = await params;
 
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [errorMessage, setErrorMessage] = useState("");
+  const {
+    data: placeData,
+    error: placeError,
+  } = await supabase
+    .from("places")
+    .select(`
+      id,
+      name,
+      description,
+      place_type_id,
+      area_id,
+      price_range,
+      editor_note,
 
-  const [siteId, setSiteId] = useState("");
+      postal_code,
+      address,
+      google_maps_url,
 
-  const [placeTypes, setPlaceTypes] = useState<PlaceType[]>([]);
-  const [areas, setAreas] = useState<Area[]>([]);
-  const [stations, setStations] = useState<Station[]>([]);
+      phone,
+      official_url,
+      instagram_url,
+      tabelog_url,
 
-  // Basic
-  const [name, setName] = useState("");
-  const [placeTypeId, setPlaceTypeId] = useState("");
+      reservation,
+      english_support,
+      opening_hours,
+      closed_days,
+      seats,
+      counter_seats,
+      table_seats,
+      card,
+      tax_free,
 
-  // Areaは自由入力
-  const [areaName, setAreaName] = useState("");
+      image_url,
+      latitude,
+      longitude
+    `)
+    .eq("id", id)
+    .eq("status", "published")
+    .maybeSingle();
 
-  const [description, setDescription] = useState("");
-  const [editorNote, setEditorNote] = useState("");
-
-  // Location
-  const [postalCode, setPostalCode] = useState("");
-  const [address, setAddress] = useState("");
-  const [googleMapsUrl, setGoogleMapsUrl] = useState("");
-
-  // Contact
-  const [phone, setPhone] = useState("");
-  const [officialUrl, setOfficialUrl] = useState("");
-  const [instagramUrl, setInstagramUrl] = useState("");
-  const [tabelogUrl, setTabelogUrl] = useState("");
-
-  // Store information
-  const [priceRange, setPriceRange] = useState("");
-  const [reservation, setReservation] = useState("");
-  const [englishSupport, setEnglishSupport] = useState("");
-
-  const [openingHours, setOpeningHours] = useState("");
-  const [closedDays, setClosedDays] = useState("");
-
-  const [seats, setSeats] = useState("");
-  const [counterSeats, setCounterSeats] = useState("");
-  const [tableSeats, setTableSeats] = useState("");
-
-  const [card, setCard] = useState(false);
-  const [taxFree, setTaxFree] = useState(false);
-
-  // Image
-  const [imageUrl, setImageUrl] = useState("");
-
-  // Publishing
-  const [status, setStatus] = useState("draft");
-
-  // Multiple access
-  const [accessRows, setAccessRows] = useState<AccessRow[]>([
-    {
-      station_id: "",
-      station_name: "",
-      station_exit: "",
-      walk_minutes: "",
-    },
-  ]);
-
-  useEffect(() => {
-    loadInitialData();
-  }, []);
-
-  async function loadInitialData() {
-    setLoading(true);
-    setErrorMessage("");
-
-    const { data: site, error: siteError } = await supabase
-      .from("sites")
-      .select("id")
-      .eq("slug", "tokyo-guide")
-      .single();
-
-    if (siteError || !site) {
-      setErrorMessage(
-        siteError?.message || "TOKYO GUIDE site could not be found."
-      );
-      setLoading(false);
-      return;
-    }
-
-    setSiteId(site.id);
-
-    const [typesResult, areasResult, stationsResult] =
-      await Promise.all([
-        supabase
-          .from("place_types")
-          .select("id, name")
-          .eq("site_id", site.id)
-          .eq("is_active", true)
-          .order("sort_order"),
-
-        supabase
-          .from("areas")
-          .select("id, name")
-          .eq("site_id", site.id)
-          .eq("is_active", true)
-          .order("name"),
-
-        supabase
-          .from("stations")
-          .select("id, name")
-          .eq("site_id", site.id)
-          .eq("is_active", true)
-          .order("name"),
-      ]);
-
-    const firstError =
-      typesResult.error ||
-      areasResult.error ||
-      stationsResult.error;
-
-    if (firstError) {
-      setErrorMessage(firstError.message);
-      setLoading(false);
-      return;
-    }
-
-    setPlaceTypes(typesResult.data ?? []);
-    setAreas(areasResult.data ?? []);
-    setStations(stationsResult.data ?? []);
-
-    setLoading(false);
-  }
-
-  function createSlug(value: string) {
-    return value
-      .toLowerCase()
-      .trim()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .replace(/\s+/g, "-")
-      .replace(/-+/g, "-");
-  }
-
-  // ------------------------------------------
-  // ACCESS
-  // ------------------------------------------
-
-  function addAccessRow() {
-    setAccessRows([
-      ...accessRows,
-      {
-        station_id: "",
-        station_name: "",
-        station_exit: "",
-        walk_minutes: "",
-      },
-    ]);
-  }
-
-  function removeAccessRow(index: number) {
-    setAccessRows(accessRows.filter((_, i) => i !== index));
-  }
-
-  function updateAccessRow(
-    index: number,
-    field: keyof AccessRow,
-    value: string
-  ) {
-    const updated = [...accessRows];
-
-    updated[index] = {
-      ...updated[index],
-      [field]: value,
-    };
-
-    if (field === "station_id") {
-      const selectedStation = stations.find(
-        (station) => String(station.id) === value
-      );
-
-      updated[index].station_name =
-        selectedStation?.name ?? "";
-    }
-
-    setAccessRows(updated);
-  }
-
-  // ------------------------------------------
-  // AREA
-  // ------------------------------------------
-
-  async function getOrCreateAreaId(): Promise<number | null> {
-    const trimmedName = areaName.trim();
-
-    if (!trimmedName) {
-      return null;
-    }
-
-    // 既存Areaを探す
-    const existingArea = areas.find(
-      (area) =>
-        area.name.toLowerCase() === trimmedName.toLowerCase()
+  if (placeError) {
+    console.error(
+      "PLACE DETAIL SUPABASE ERROR:",
+      placeError
     );
 
-    if (existingArea) {
-      return existingArea.id;
-    }
-
-    // 新しいAreaを作成
-    const { data: newArea, error } = await supabase
-      .from("areas")
-      .insert({
-        site_id: siteId,
-        name: trimmedName,
-        slug: createSlug(trimmedName),
-        is_active: true,
-      })
-      .select("id, name")
-      .single();
-
-    if (error || !newArea) {
-      throw new Error(
-        error?.message || "Failed to create area."
-      );
-    }
-
-    return newArea.id;
-  }
-
-  // ------------------------------------------
-  // SAVE
-  // ------------------------------------------
-
-  async function handleSave() {
-    setErrorMessage("");
-
-    if (!name.trim()) {
-      setErrorMessage("Please enter a Place Name.");
-      return;
-    }
-
-    if (!siteId) {
-      setErrorMessage("Site information could not be loaded.");
-      return;
-    }
-
-    setSaving(true);
-
-    try {
-      // Areaを取得または新規作成
-      const areaId = await getOrCreateAreaId();
-
-      // Place作成
-      const { data: newPlace, error: placeError } =
-        await supabase
-          .from("places")
-          .insert({
-            site_id: siteId,
-
-            place_type_id: placeTypeId
-              ? Number(placeTypeId)
-              : null,
-
-            area_id: areaId,
-
-            name: name.trim(),
-            slug: createSlug(name),
-
-            description: description || null,
-            editor_note: editorNote || null,
-
-            postal_code: postalCode || null,
-            address: address || null,
-            google_maps_url: googleMapsUrl || null,
-
-            phone: phone || null,
-
-            official_url: officialUrl || null,
-            instagram_url: instagramUrl || null,
-            tabelog_url: tabelogUrl || null,
-
-            price_range: priceRange || null,
-            reservation: reservation || null,
-            english_support: englishSupport || null,
-
-            opening_hours: openingHours || null,
-            closed_days: closedDays || null,
-
-            seats: seats ? Number(seats) : null,
-            counter_seats: counterSeats
-              ? Number(counterSeats)
-              : null,
-            table_seats: tableSeats
-              ? Number(tableSeats)
-              : null,
-
-            card,
-            tax_free: taxFree,
-
-            image_url: imageUrl || null,
-
-            status,
-          })
-          .select("id")
-          .single();
-
-      if (placeError || !newPlace) {
-        throw new Error(
-          placeError?.message || "Failed to save place."
-        );
-      }
-
-      // ------------------------------------------
-      // Multiple Stations
-      // ------------------------------------------
-
-      const validAccessRows = accessRows.filter(
-        (row) => row.station_id
-      );
-
-      if (validAccessRows.length > 0) {
-        const accessData = validAccessRows.map(
-          (row, index) => ({
-            place_id: newPlace.id,
-            station_id: Number(row.station_id),
-            station_exit: row.station_exit || null,
-            walk_minutes: row.walk_minutes
-              ? Number(row.walk_minutes)
-              : null,
-            sort_order: index,
-          })
-        );
-
-        const { error: accessError } = await supabase
-          .from("place_access")
-          .insert(accessData);
-
-        if (accessError) {
-          throw new Error(
-            `Place was saved, but access information failed: ${accessError.message}`
-          );
-        }
-      }
-
-      router.push(`/admin/places/${newPlace.id}`);
-      router.refresh();
-    } catch (error) {
-      setErrorMessage(
-        error instanceof Error
-          ? error.message
-          : "Something went wrong."
-      );
-    } finally {
-      setSaving(false);
-    }
-  }
-
-  if (loading) {
     return (
-      <main style={styles.page}>
-        <div style={styles.loading}>
-          Loading your Tokyo Guide...
+      <main style={styles.errorMain}>
+        <div style={styles.errorBox}>
+          <h1 style={styles.errorTitle}>
+            Place could not be loaded
+          </h1>
+
+          <p style={styles.errorMessage}>
+            {placeError.message}
+          </p>
+
+          <p style={styles.errorId}>
+            Place ID: {id}
+          </p>
+
+          <Link
+            href="/places"
+            style={styles.back}
+          >
+            ← Back to Places
+          </Link>
         </div>
       </main>
     );
   }
 
+  if (!placeData) {
+    notFound();
+  }
+
+  const place = placeData as Place;
+
+  const [
+    imagesResult,
+    areaResult,
+    productRelationsResult,
+  ] = await Promise.all([
+    supabase
+      .from("place_images")
+      .select(`
+        id,
+        image_url,
+        sort_order
+      `)
+      .eq("place_id", place.id)
+      .order("sort_order"),
+
+    place.area_id !== null
+      ? supabase
+          .from("areas")
+          .select("id, name")
+          .eq("id", place.area_id)
+          .maybeSingle()
+      : Promise.resolve({
+          data: null,
+          error: null,
+        }),
+
+    supabase
+      .from("place_products")
+      .select("product_id")
+      .eq("place_id", place.id)
+      .eq("available", true),
+  ]);
+
+  const images =
+    (imagesResult.data ?? []) as PlaceImage[];
+
+  const area = areaResult.data
+    ? (areaResult.data as Area)
+    : null;
+
+  const productRelations =
+    (productRelationsResult.data ??
+      []) as PlaceProductRelation[];
+
+  const productIds = [
+    ...new Set(
+      productRelations.map(
+        (relation) =>
+          relation.product_id
+      )
+    ),
+  ];
+
+  let products: Product[] = [];
+
+  if (productIds.length > 0) {
+    const {
+      data: productsData,
+    } = await supabase
+      .from("products")
+      .select(`
+        id,
+        name,
+        brand,
+        description,
+        image_url,
+        editor_pick
+      `)
+      .in("id", productIds)
+      .eq("status", "published")
+      .order("name");
+
+    products =
+      (productsData ?? []) as Product[];
+  }
+
+  const heroImage =
+    images.length > 0
+      ? images[0].image_url
+      : place.image_url;
+
   return (
-    <main style={styles.page}>
+    <main style={styles.main}>
       <div style={styles.container}>
+        <div style={styles.subHeader}>
+          <Link
+            href="/places"
+            style={styles.back}
+          >
+            ← Places
+          </Link>
+        </div>
 
-        {/* HEADER */}
+        <section style={styles.hero}>
+          <div style={styles.imageArea}>
+            {heroImage ? (
+              <img
+                src={heroImage}
+                alt={place.name}
+                style={styles.heroImage}
+              />
+            ) : (
+              <div style={styles.placeholder}>
+                TOKYO GUIDE
+              </div>
+            )}
+          </div>
 
-        <div style={styles.header}>
-          <div>
-            <Link
-              href="/admin/places"
-              style={styles.backLink}
-            >
-              ← Back to Places
-            </Link>
+          <div style={styles.infoArea}>
+            {area && (
+              <p style={styles.area}>
+                {area.name}
+              </p>
+            )}
 
             <h1 style={styles.title}>
-              ✦ Add a New Place
+              {place.name}
             </h1>
 
-            <p style={styles.subtitle}>
-              Add your favorite spot to TOKYO GUIDE
-            </p>
-          </div>
+            <div style={styles.saveArea}>
+              <SaveButton
+                type="place"
+                itemId={place.id}
+              />
+            </div>
 
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            style={styles.saveButton}
-          >
-            {saving ? "Saving..." : "Save Place ✦"}
-          </button>
-        </div>
-
-        {errorMessage && (
-          <div style={styles.error}>
-            {errorMessage}
-          </div>
-        )}
-
-        {/* BASIC */}
-
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <span style={styles.icon}>✦</span>
-
-            <div>
-              <h2 style={styles.sectionTitle}>
-                Basic Information
-              </h2>
-
-              <p style={styles.sectionText}>
-                The essentials
+            {place.price_range && (
+              <p style={styles.price}>
+                {place.price_range}
               </p>
-            </div>
-          </div>
+            )}
 
-          <div style={styles.formGrid}>
-            <div style={styles.full}>
-              <label style={styles.label}>
-                Place Name *
-              </label>
-
-              <input
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                placeholder="e.g. Senso-ji Temple"
-                style={styles.input}
-              />
-            </div>
-
-            <div>
-              <label style={styles.label}>
-                Type
-              </label>
-
-              <select
-                value={placeTypeId}
-                onChange={(e) =>
-                  setPlaceTypeId(e.target.value)
-                }
-                style={styles.input}
-              >
-                <option value="">
-                  Select type
-                </option>
-
-                {placeTypes.map((type) => (
-                  <option
-                    key={type.id}
-                    value={type.id}
-                  >
-                    {type.name}
-                  </option>
-                ))}
-              </select>
-            </div>
-
-            <div>
-              <label style={styles.label}>
-                Area
-              </label>
-
-              <input
-                list="area-options"
-                value={areaName}
-                onChange={(e) =>
-                  setAreaName(e.target.value)
-                }
-                placeholder="Type a new area or choose one"
-                style={styles.input}
-              />
-
-              <datalist id="area-options">
-                {areas.map((area) => (
-                  <option
-                    key={area.id}
-                    value={area.name}
-                  />
-                ))}
-              </datalist>
-
-              <p style={styles.helper}>
-                You can type a new area anytime ✦
+            {place.description && (
+              <p style={styles.description}>
+                {place.description}
               </p>
-            </div>
-          </div>
+            )}
 
-          <div style={styles.full}>
-            <label style={styles.label}>
-              Description
-            </label>
-
-            <textarea
-              value={description}
-              onChange={(e) =>
-                setDescription(e.target.value)
-              }
-              placeholder="Tell visitors why this place is special..."
-              style={styles.textarea}
-            />
-          </div>
-
-          <div style={styles.full}>
-            <label style={styles.label}>
-              Editor Note
-            </label>
-
-            <textarea
-              value={editorNote}
-              onChange={(e) =>
-                setEditorNote(e.target.value)
-              }
-              placeholder="Your private notes..."
-              style={styles.textareaSmall}
-            />
-          </div>
-        </section>
-
-        {/* LOCATION */}
-
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <span style={styles.icon}>📍</span>
-
-            <div>
-              <h2 style={styles.sectionTitle}>
-                Location
-              </h2>
-            </div>
-          </div>
-
-          <div style={styles.formGrid}>
-            <div>
-              <label style={styles.label}>
-                Postal Code
-              </label>
-
-              <input
-                value={postalCode}
-                onChange={(e) =>
-                  setPostalCode(e.target.value)
-                }
-                style={styles.input}
-              />
-            </div>
-
-            <div>
-              <label style={styles.label}>
-                Google Maps URL
-              </label>
-
-              <input
-                value={googleMapsUrl}
-                onChange={(e) =>
-                  setGoogleMapsUrl(e.target.value)
-                }
-                placeholder="Paste Google Maps link"
-                style={styles.input}
-              />
-            </div>
-
-            <div style={styles.full}>
-              <label style={styles.label}>
-                Address
-              </label>
-
-              <input
-                value={address}
-                onChange={(e) =>
-                  setAddress(e.target.value)
-                }
-                placeholder="Full address"
-                style={styles.input}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* ACCESS */}
-
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <span style={styles.icon}>🚃</span>
-
-            <div>
-              <h2 style={styles.sectionTitle}>
-                Access
-              </h2>
-
-              <p style={styles.sectionText}>
-                Add as many nearby stations as you want
-              </p>
-            </div>
-          </div>
-
-          {accessRows.map((row, index) => (
-            <div
-              key={index}
-              style={styles.accessRow}
-            >
-              <select
-                value={row.station_id}
-                onChange={(e) =>
-                  updateAccessRow(
-                    index,
-                    "station_id",
-                    e.target.value
-                  )
-                }
-                style={styles.input}
-              >
-                <option value="">
-                  Select station
-                </option>
-
-                {stations.map((station) => (
-                  <option
-                    key={station.id}
-                    value={station.id}
-                  >
-                    {station.name}
-                  </option>
-                ))}
-              </select>
-
-              <input
-                value={row.station_exit}
-                onChange={(e) =>
-                  updateAccessRow(
-                    index,
-                    "station_exit",
-                    e.target.value
-                  )
-                }
-                placeholder="Exit"
-                style={styles.input}
-              />
-
-              <input
-                type="number"
-                value={row.walk_minutes}
-                onChange={(e) =>
-                  updateAccessRow(
-                    index,
-                    "walk_minutes",
-                    e.target.value
-                  )
-                }
-                placeholder="Minutes"
-                style={styles.input}
-              />
-
-              {accessRows.length > 1 && (
-                <button
-                  type="button"
-                  onClick={() =>
-                    removeAccessRow(index)
+            {place.editor_note && (
+              <div style={styles.editorNote}>
+                <p
+                  style={
+                    styles.editorNoteLabel
                   }
-                  style={styles.removeButton}
                 >
-                  ×
-                </button>
+                  TOKYO GIRL'S NOTE
+                </p>
+
+                <p
+                  style={
+                    styles.editorNoteText
+                  }
+                >
+                  {place.editor_note}
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        <section style={styles.section}>
+          <div style={styles.sectionHeader}>
+            <div>
+              <p
+                style={
+                  styles.sectionEyebrow
+                }
+              >
+                INFORMATION
+              </p>
+
+              <h2
+                style={styles.sectionTitle}
+              >
+                About this place
+              </h2>
+            </div>
+          </div>
+
+          <div style={styles.infoGrid}>
+            {(place.address ||
+              place.postal_code) && (
+              <div style={styles.infoItem}>
+                <p style={styles.infoLabel}>
+                  ADDRESS
+                </p>
+
+                {place.postal_code && (
+                  <p style={styles.infoValue}>
+                    {place.postal_code}
+                  </p>
+                )}
+
+                {place.address && (
+                  <p style={styles.infoValue}>
+                    {place.address}
+                  </p>
+                )}
+
+                {place.google_maps_url && (
+                  <a
+                    href={
+                      place.google_maps_url
+                    }
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    style={styles.infoLink}
+                  >
+                    Open in Google Maps →
+                  </a>
+                )}
+              </div>
+            )}
+
+            {place.opening_hours && (
+              <div style={styles.infoItem}>
+                <p style={styles.infoLabel}>
+                  OPENING HOURS
+                </p>
+
+                <p style={styles.infoValue}>
+                  {place.opening_hours}
+                </p>
+
+                {place.closed_days && (
+                  <p
+                    style={
+                      styles.infoSecondary
+                    }
+                  >
+                    Closed:{" "}
+                    {place.closed_days}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {place.reservation && (
+              <div style={styles.infoItem}>
+                <p style={styles.infoLabel}>
+                  RESERVATION
+                </p>
+
+                <p style={styles.infoValue}>
+                  {place.reservation}
+                </p>
+              </div>
+            )}
+
+            {place.english_support && (
+              <div style={styles.infoItem}>
+                <p style={styles.infoLabel}>
+                  ENGLISH SUPPORT
+                </p>
+
+                <p style={styles.infoValue}>
+                  {place.english_support}
+                </p>
+              </div>
+            )}
+
+            {(place.seats ||
+              place.counter_seats ||
+              place.table_seats) && (
+              <div style={styles.infoItem}>
+                <p style={styles.infoLabel}>
+                  SEATING
+                </p>
+
+                {place.seats && (
+                  <p style={styles.infoValue}>
+                    Total: {place.seats}
+                  </p>
+                )}
+
+                {place.counter_seats && (
+                  <p style={styles.infoSecondary}>
+                    Counter:{" "}
+                    {place.counter_seats}
+                  </p>
+                )}
+
+                {place.table_seats && (
+                  <p style={styles.infoSecondary}>
+                    Table:{" "}
+                    {place.table_seats}
+                  </p>
+                )}
+              </div>
+            )}
+
+            {place.card && (
+              <div style={styles.infoItem}>
+                <p style={styles.infoLabel}>
+                  PAYMENT
+                </p>
+
+                <p style={styles.infoValue}>
+                  {place.card}
+                </p>
+              </div>
+            )}
+
+            {place.tax_free && (
+              <div style={styles.infoItem}>
+                <p style={styles.infoLabel}>
+                  TAX FREE
+                </p>
+
+                <p style={styles.infoValue}>
+                  {place.tax_free}
+                </p>
+              </div>
+            )}
+
+            {place.phone && (
+              <div style={styles.infoItem}>
+                <p style={styles.infoLabel}>
+                  PHONE
+                </p>
+
+                <p style={styles.infoValue}>
+                  {place.phone}
+                </p>
+              </div>
+            )}
+          </div>
+        </section>
+
+        {(place.official_url ||
+          place.instagram_url ||
+          place.tabelog_url) && (
+          <section style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <div>
+                <p
+                  style={
+                    styles.sectionEyebrow
+                  }
+                >
+                  LINKS
+                </p>
+
+                <h2
+                  style={styles.sectionTitle}
+                >
+                  Find out more
+                </h2>
+              </div>
+            </div>
+
+            <div style={styles.linkList}>
+              {place.official_url && (
+                <a
+                  href={place.official_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={styles.externalLink}
+                >
+                  Official Website
+                  <span>→</span>
+                </a>
+              )}
+
+              {place.instagram_url && (
+                <a
+                  href={place.instagram_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={styles.externalLink}
+                >
+                  Instagram
+                  <span>→</span>
+                </a>
+              )}
+
+              {place.tabelog_url && (
+                <a
+                  href={place.tabelog_url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={styles.externalLink}
+                >
+                  Tabelog
+                  <span>→</span>
+                </a>
               )}
             </div>
-          ))}
+          </section>
+        )}
 
-          <button
-            type="button"
-            onClick={addAccessRow}
-            style={styles.addButton}
-          >
-            ＋ Add another station
-          </button>
-        </section>
+        {images.length > 1 && (
+          <section style={styles.section}>
+            <div style={styles.sectionHeader}>
+              <div>
+                <p
+                  style={
+                    styles.sectionEyebrow
+                  }
+                >
+                  INSIDE THE PLACE
+                </p>
 
-        {/* CONTACT */}
+                <h2
+                  style={styles.sectionTitle}
+                >
+                  Gallery
+                </h2>
+              </div>
+            </div>
 
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <span style={styles.icon}>♡</span>
+            <div style={styles.galleryGrid}>
+              {images
+                .slice(1)
+                .map((image) => (
+                  <div
+                    key={image.id}
+                    style={
+                      styles.galleryImage
+                    }
+                  >
+                    <img
+                      src={image.image_url}
+                      alt={place.name}
+                      style={
+                        styles.galleryImageElement
+                      }
+                    />
+                  </div>
+                ))}
+            </div>
+          </section>
+        )}
 
+        <section style={styles.section}>
+          <div style={styles.sectionHeader}>
             <div>
-              <h2 style={styles.sectionTitle}>
-                Links & Contact
+              <p
+                style={
+                  styles.sectionEyebrow
+                }
+              >
+                WHAT TO BUY
+              </p>
+
+              <h2
+                style={styles.sectionTitle}
+              >
+                Available here
               </h2>
             </div>
+
+            {products.length > 0 && (
+              <span style={styles.count}>
+                {products.length}{" "}
+                {products.length === 1
+                  ? "product"
+                  : "products"}
+              </span>
+            )}
           </div>
 
-          <div style={styles.formGrid}>
-            <div>
-              <label style={styles.label}>Phone</label>
+          {products.length === 0 ? (
+            <div style={styles.empty}>
+              <p style={styles.emptyTitle}>
+                No products listed yet.
+              </p>
 
-              <input
-                value={phone}
-                onChange={(e) => setPhone(e.target.value)}
-                style={styles.input}
-              />
+              <p style={styles.emptyText}>
+                Products available at this
+                place will be added soon.
+              </p>
             </div>
+          ) : (
+            <div style={styles.productGrid}>
+              {products.map(
+                (product) => (
+                  <Link
+                    key={product.id}
+                    href={`/products/${product.id}`}
+                    style={
+                      styles.productCard
+                    }
+                  >
+                    <div
+                      style={
+                        styles.productImage
+                      }
+                    >
+                      {product.image_url ? (
+                        <img
+                          src={
+                            product.image_url
+                          }
+                          alt={
+                            product.name
+                          }
+                          style={
+                            styles.productImageElement
+                          }
+                        />
+                      ) : (
+                        <span>
+                          TOKYO GUIDE
+                        </span>
+                      )}
 
-            <div>
-              <label style={styles.label}>
-                Official Website
-              </label>
+                      {(product.editor_pick ??
+                        0) > 0 && (
+                        <span
+                          style={
+                            styles.pickBadge
+                          }
+                        >
+                          PICK
+                        </span>
+                      )}
+                    </div>
 
-              <input
-                value={officialUrl}
-                onChange={(e) =>
-                  setOfficialUrl(e.target.value)
-                }
-                style={styles.input}
-              />
+                    <div
+                      style={
+                        styles.productBody
+                      }
+                    >
+                      {product.brand && (
+                        <p
+                          style={
+                            styles.brand
+                          }
+                        >
+                          {product.brand}
+                        </p>
+                      )}
+
+                      <h3
+                        style={
+                          styles.productName
+                        }
+                      >
+                        {product.name}
+                      </h3>
+
+                      {product.description && (
+                        <p
+                          style={
+                            styles.productDescription
+                          }
+                        >
+                          {
+                            product.description
+                          }
+                        </p>
+                      )}
+
+                      <div
+                        style={
+                          styles.viewProduct
+                        }
+                      >
+                        <span>
+                          View product
+                        </span>
+
+                        <span>
+                          →
+                        </span>
+                      </div>
+                    </div>
+                  </Link>
+                )
+              )}
             </div>
-
-            <div>
-              <label style={styles.label}>
-                Instagram
-              </label>
-
-              <input
-                value={instagramUrl}
-                onChange={(e) =>
-                  setInstagramUrl(e.target.value)
-                }
-                style={styles.input}
-              />
-            </div>
-
-            <div>
-              <label style={styles.label}>
-                Tabelog
-              </label>
-
-              <input
-                value={tabelogUrl}
-                onChange={(e) =>
-                  setTabelogUrl(e.target.value)
-                }
-                style={styles.input}
-              />
-            </div>
-          </div>
+          )}
         </section>
-
-        {/* DETAILS */}
-
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <span style={styles.icon}>☕</span>
-
-            <div>
-              <h2 style={styles.sectionTitle}>
-                Details
-              </h2>
-            </div>
-          </div>
-
-          <div style={styles.formGrid}>
-            <div>
-              <label style={styles.label}>
-                Price Range
-              </label>
-
-              <input
-                value={priceRange}
-                onChange={(e) =>
-                  setPriceRange(e.target.value)
-                }
-                placeholder="¥1,000–¥2,000"
-                style={styles.input}
-              />
-            </div>
-
-            <div>
-              <label style={styles.label}>
-                Reservation
-              </label>
-
-              <input
-                value={reservation}
-                onChange={(e) =>
-                  setReservation(e.target.value)
-                }
-                style={styles.input}
-              />
-            </div>
-
-            <div>
-              <label style={styles.label}>
-                English Support
-              </label>
-
-              <input
-                value={englishSupport}
-                onChange={(e) =>
-                  setEnglishSupport(e.target.value)
-                }
-                style={styles.input}
-              />
-            </div>
-
-            <div>
-              <label style={styles.label}>
-                Opening Hours
-              </label>
-
-              <input
-                value={openingHours}
-                onChange={(e) =>
-                  setOpeningHours(e.target.value)
-                }
-                style={styles.input}
-              />
-            </div>
-
-            <div>
-              <label style={styles.label}>
-                Closed Days
-              </label>
-
-              <input
-                value={closedDays}
-                onChange={(e) =>
-                  setClosedDays(e.target.value)
-                }
-                style={styles.input}
-              />
-            </div>
-          </div>
-        </section>
-
-        {/* IMAGE */}
-
-        <section style={styles.card}>
-          <div style={styles.cardHeader}>
-            <span style={styles.icon}>✧</span>
-
-            <div>
-              <h2 style={styles.sectionTitle}>
-                Image
-              </h2>
-            </div>
-          </div>
-
-          <input
-            value={imageUrl}
-            onChange={(e) =>
-              setImageUrl(e.target.value)
-            }
-            placeholder="Image URL"
-            style={styles.input}
-          />
-        </section>
-
-        {/* PUBLISH */}
-
-        <section style={styles.card}>
-          <h2 style={styles.sectionTitle}>
-            Publishing
-          </h2>
-
-          <select
-            value={status}
-            onChange={(e) =>
-              setStatus(e.target.value)
-            }
-            style={styles.input}
-          >
-            <option value="draft">Draft</option>
-            <option value="published">
-              Published
-            </option>
-            <option value="hidden">Hidden</option>
-            <option value="archived">
-              Archived
-            </option>
-          </select>
-        </section>
-
-        <div style={styles.bottom}>
-          <Link
-            href="/admin/places"
-            style={styles.cancelButton}
-          >
-            Cancel
-          </Link>
-
-          <button
-            onClick={handleSave}
-            disabled={saving}
-            style={styles.saveButton}
-          >
-            {saving ? "Saving..." : "Save Place ✦"}
-          </button>
-        </div>
-
       </div>
     </main>
   );
 }
 
-
 const styles = {
-  page: {
+  main: {
     minHeight: "100vh",
-    padding: "40px 20px 100px",
-    background:
-      "linear-gradient(135deg, #fff7fb 0%, #f8f5ff 45%, #fff9f3 100%)",
-    color: "#453b46",
+    background: "#fffaf8",
+    color: "#222",
+  },
+
+  errorMain: {
+    minHeight: "100vh",
+    padding: "60px 24px",
+    background: "#fffaf8",
+    color: "#222",
+  },
+
+  errorBox: {
+    maxWidth: "800px",
+    margin: "0 auto",
+    background: "#fff",
+    border: "1px solid #e5ddd9",
+    borderRadius: "16px",
+    padding: "30px",
+  },
+
+  errorTitle: {
+    fontFamily: "Georgia, serif",
+    fontWeight: 400,
+    fontSize: "30px",
+    margin: 0,
+  },
+
+  errorMessage: {
+    marginTop: "20px",
+    color: "#c8647b",
+    fontSize: "14px",
+    lineHeight: 1.7,
+    wordBreak: "break-word" as const,
+  },
+
+  errorId: {
+    marginTop: "20px",
+    color: "#777",
+    fontSize: "12px",
+    lineHeight: 1.7,
+    wordBreak: "break-word" as const,
   },
 
   container: {
-    maxWidth: "1000px",
+    maxWidth: "1100px",
     margin: "0 auto",
+    padding: "0 24px 100px",
   },
 
-  loading: {
-    textAlign: "center" as const,
-    padding: "100px 20px",
-    color: "#8d7183",
+  subHeader: {
+    padding: "22px 0 0",
   },
 
-  header: {
-    display: "flex",
-    justifyContent: "space-between",
-    alignItems: "center",
-    gap: "20px",
-    marginBottom: "30px",
-  },
-
-  backLink: {
+  back: {
+    color: "#777",
     textDecoration: "none",
-    color: "#a27891",
-    fontSize: "14px",
-    fontWeight: 600,
+    fontSize: "12px",
   },
 
-  title: {
-    fontSize: "34px",
-    margin: "12px 0 6px",
-    letterSpacing: "-1px",
+  hero: {
+    display: "grid",
+    gridTemplateColumns:
+      "minmax(0, 1.05fr) minmax(0, 1fr)",
+    gap: "55px",
+    alignItems: "start",
+    paddingTop: "28px",
   },
 
-  subtitle: {
-    margin: 0,
-    color: "#947f8d",
-  },
-
-  card: {
-    background: "rgba(255,255,255,0.85)",
-    border: "1px solid #f0dfe8",
-    borderRadius: "24px",
-    padding: "28px",
-    marginBottom: "20px",
-    boxShadow: "0 8px 30px rgba(173,120,150,0.08)",
-  },
-
-  cardHeader: {
-    display: "flex",
-    alignItems: "center",
-    gap: "13px",
-    marginBottom: "22px",
-  },
-
-  icon: {
-    width: "42px",
-    height: "42px",
-    borderRadius: "14px",
+  imageArea: {
+    aspectRatio: "1 / 1",
+    background: "#f2e7e2",
+    borderRadius: "18px",
+    overflow: "hidden",
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    background: "#fff0f6",
-    fontSize: "20px",
+  },
+
+  heroImage: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover" as const,
+    display: "block",
+  },
+
+  placeholder: {
+    color: "#987a73",
+    fontFamily: "Georgia, serif",
+    fontSize: "11px",
+    letterSpacing: "2px",
+  },
+
+  infoArea: {
+    paddingTop: "20px",
+  },
+
+  area: {
+    color: "#c8647b",
+    fontSize: "10px",
+    fontWeight: 700,
+    letterSpacing: "1.2px",
+    margin: 0,
+    textTransform:
+      "uppercase" as const,
+  },
+
+  title: {
+    fontFamily: "Georgia, serif",
+    fontWeight: 400,
+    fontSize: "48px",
+    lineHeight: 1.15,
+    margin: "12px 0 0",
+  },
+
+  saveArea: {
+    marginTop: "20px",
+  },
+
+  price: {
+    color: "#666",
+    fontSize: "12px",
+    margin: "15px 0 0",
+  },
+
+  description: {
+    color: "#666",
+    fontSize: "14px",
+    lineHeight: 1.9,
+    marginTop: "25px",
+  },
+
+  editorNote: {
+    marginTop: "28px",
+    padding: "18px",
+    background: "#fff",
+    borderLeft:
+      "3px solid #c8647b",
+  },
+
+  editorNoteLabel: {
+    color: "#c8647b",
+    fontSize: "9px",
+    fontWeight: 700,
+    letterSpacing: "1.8px",
+    margin: 0,
+  },
+
+  editorNoteText: {
+    color: "#555",
+    fontSize: "13px",
+    lineHeight: 1.8,
+    margin: "9px 0 0",
+  },
+
+  section: {
+    marginTop: "65px",
+    paddingTop: "32px",
+    borderTop:
+      "1px solid #e8dfdb",
+  },
+
+  sectionHeader: {
+    display: "flex",
+    justifyContent:
+      "space-between",
+    alignItems: "flex-end",
+    gap: "20px",
+    marginBottom: "25px",
+  },
+
+  sectionEyebrow: {
+    color: "#c8647b",
+    fontSize: "9px",
+    fontWeight: 700,
+    letterSpacing: "2px",
+    margin: 0,
   },
 
   sectionTitle: {
-    margin: 0,
-    fontSize: "20px",
+    fontFamily: "Georgia, serif",
+    fontWeight: 400,
+    fontSize: "30px",
+    margin: "7px 0 0",
   },
 
-  sectionText: {
-    margin: "4px 0 0",
-    color: "#a28b99",
-    fontSize: "13px",
-  },
-
-  formGrid: {
+  infoGrid: {
     display: "grid",
     gridTemplateColumns:
-      "repeat(auto-fit, minmax(230px, 1fr))",
+      "repeat(2, minmax(0, 1fr))",
+    gap: "1px",
+    background: "#e8dfdb",
+    border: "1px solid #e8dfdb",
+  },
+
+  infoItem: {
+    background: "#fff",
+    padding: "22px",
+    minHeight: "100px",
+  },
+
+  infoLabel: {
+    color: "#c8647b",
+    fontSize: "9px",
+    fontWeight: 700,
+    letterSpacing: "1.6px",
+    margin: 0,
+  },
+
+  infoValue: {
+    color: "#444",
+    fontSize: "13px",
+    lineHeight: 1.8,
+    margin: "8px 0 0",
+    whiteSpace: "pre-line" as const,
+  },
+
+  infoSecondary: {
+    color: "#888",
+    fontSize: "12px",
+    lineHeight: 1.7,
+    margin: "5px 0 0",
+    whiteSpace: "pre-line" as const,
+  },
+
+  infoLink: {
+    display: "inline-block",
+    marginTop: "10px",
+    color: "#c8647b",
+    textDecoration: "none",
+    fontSize: "11px",
+  },
+
+  linkList: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(3, minmax(0, 1fr))",
+    gap: "12px",
+  },
+
+  externalLink: {
+    display: "flex",
+    justifyContent:
+      "space-between",
+    alignItems: "center",
+    padding: "16px 18px",
+    background: "#fff",
+    border: "1px solid #e5ddd9",
+    borderRadius: "12px",
+    color: "#333",
+    textDecoration: "none",
+    fontSize: "12px",
+  },
+
+  galleryGrid: {
+    display: "grid",
+    gridTemplateColumns:
+      "repeat(3, minmax(0, 1fr))",
     gap: "18px",
   },
 
-  full: {
-    gridColumn: "1 / -1",
-    marginTop: "18px",
+  galleryImage: {
+    aspectRatio: "1 / 1",
+    borderRadius: "14px",
+    overflow: "hidden",
+    background: "#f2e7e2",
   },
 
-  label: {
+  galleryImageElement: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover" as const,
     display: "block",
-    marginBottom: "8px",
-    fontSize: "13px",
-    fontWeight: 700,
-    color: "#654f5d",
   },
 
-  input: {
-    width: "100%",
-    height: "48px",
-    padding: "0 14px",
-    borderRadius: "12px",
-    border: "1px solid #ead9e2",
-    background: "#fff",
-    fontSize: "14px",
-    color: "#493d45",
-    boxSizing: "border-box" as const,
-  },
-
-  textarea: {
-    width: "100%",
-    minHeight: "120px",
-    padding: "14px",
-    borderRadius: "14px",
-    border: "1px solid #ead9e2",
-    background: "#fff",
-    fontSize: "14px",
-    boxSizing: "border-box" as const,
-    resize: "vertical" as const,
-  },
-
-  textareaSmall: {
-    width: "100%",
-    minHeight: "80px",
-    padding: "14px",
-    borderRadius: "14px",
-    border: "1px solid #ead9e2",
-    background: "#fffafc",
-    fontSize: "14px",
-    boxSizing: "border-box" as const,
-    resize: "vertical" as const,
-  },
-
-  helper: {
-    margin: "7px 0 0",
-    fontSize: "12px",
-    color: "#b08b9f",
-  },
-
-  accessRow: {
+  productGrid: {
     display: "grid",
-    gridTemplateColumns: "2fr 1fr 1fr 42px",
-    gap: "10px",
-    alignItems: "center",
-    marginBottom: "10px",
+    gridTemplateColumns:
+      "repeat(3, minmax(0, 1fr))",
+    gap: "18px",
   },
 
-  addButton: {
-    marginTop: "8px",
-    border: "1px dashed #d8a8c0",
-    background: "#fff6fa",
-    color: "#a56787",
-    padding: "11px 16px",
-    borderRadius: "12px",
-    cursor: "pointer",
-    fontWeight: 600,
-  },
-
-  removeButton: {
-    width: "38px",
-    height: "38px",
-    borderRadius: "50%",
-    border: "none",
-    background: "#fff0f3",
-    color: "#c57b91",
-    cursor: "pointer",
-    fontSize: "20px",
-  },
-
-  saveButton: {
-    border: "none",
-    borderRadius: "14px",
-    padding: "14px 22px",
-    background:
-      "linear-gradient(135deg, #e69ab7, #c69adf)",
-    color: "#fff",
-    fontWeight: 700,
-    cursor: "pointer",
-    boxShadow: "0 6px 18px rgba(198,154,223,0.25)",
-  },
-
-  cancelButton: {
-    padding: "13px 20px",
-    borderRadius: "14px",
-    background: "#fff",
-    border: "1px solid #ead9e2",
-    color: "#806c78",
+  productCard: {
+    display: "block",
+    color: "#222",
     textDecoration: "none",
+    background: "#fff",
+    border: "1px solid #e5ddd9",
+    borderRadius: "15px",
+    overflow: "hidden",
   },
 
-  bottom: {
+  productImage: {
+    position: "relative" as const,
+    aspectRatio: "1 / 1",
+    background: "#f2e7e2",
     display: "flex",
-    justifyContent: "flex-end",
-    gap: "12px",
-    marginTop: "30px",
+    alignItems: "center",
+    justifyContent: "center",
+    overflow: "hidden",
+    color: "#987a73",
+    fontFamily: "Georgia, serif",
+    fontSize: "9px",
+    letterSpacing: "2px",
   },
 
-  error: {
-    marginBottom: "20px",
-    padding: "16px",
-    borderRadius: "14px",
-    background: "#fff0f2",
-    border: "1px solid #f0b7c1",
-    color: "#a74d60",
+  productImageElement: {
+    width: "100%",
+    height: "100%",
+    objectFit: "cover" as const,
+    display: "block",
   },
-};
+
+  pickBadge: {
+    position: "absolute" as const,
+    top: "10px",
+    right: "10px",
+    background: "#222",
+    color: "#fff",
+    borderRadius: "999px",
+    padding: "6px 8px",
+    fontSize: "8px",
+    letterSpacing: "1px",
+  },
+
+  productBody: {
+    padding: "15px",
+  },
+
+  brand: {
+    color: "#c8647b",
+    fontSize: "9px",
+    fontWeight: 700,
+    letterSpacing: "0.8px",
+    margin: 0,
+  },
+
+  productName: {
+    fontFamily: "Georgia, serif",
+    fontSize: "21px",
+    fontWeight: 400,
+    margin: "6px 0 0",
+  },
+
+  productDescription: {
+    color: "#777",
+    fontSize: "11px",
+    lineHeight: 1.7,
+    margin: "10px 0 0",
+  },
+
+  viewProduct: {
+    display: "flex",
+    justifyContent:
+      "space-between",
+    alignItems: "center",
+    marginTop: "16px",
+    paddingTop: "12px",
+    borderTop:
+      "1px solid #eee6e2",
+    color: "#c8647b",
+    fontSize: "11px",
+  },
+
+  count: {
+    color: "#999",
+    fontSize: "11px",
+  },
+
+  empty: {
+    padding: "60px 20px",
+    background: "#fff",
+    border: "1px solid #e7e0dc",
+    borderRadius: "15px",
+    textAlign: "center" as const,
+  },
+
+  emptyTitle: {
+    fontFamily: "Georgia, serif",
+    fontSize: "21px",
+    margin: 0,
+  },
+
+  emptyText: {
+    color: "#999",
+    fontSize: "12px",
+    margin: "10px 0 0",
+  },
+} as const;
