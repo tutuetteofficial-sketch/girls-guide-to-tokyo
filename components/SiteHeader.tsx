@@ -8,22 +8,27 @@ const navItems = [
   {
     label: "FOOD",
     href: "/food",
+    adminHref: "/admin/food",
   },
   {
     label: "PRODUCTS",
     href: "/products",
+    adminHref: "/admin/products",
   },
   {
     label: "PLACES",
     href: "/places",
+    adminHref: "/admin/places",
   },
   {
     label: "ARTICLES",
     href: "/articles",
+    adminHref: "/admin/articles",
   },
   {
     label: "MY LIST",
     href: "/my-list",
+    adminHref: "/admin/my-list",
   },
 ];
 
@@ -31,32 +36,48 @@ export default function SiteHeader() {
   const pathname = usePathname();
   const [menuOpen, setMenuOpen] = useState(false);
 
-  function isActive(href: string) {
-    if (href === "/places") {
+  // Adminページにいるかどうか
+  const isAdmin = pathname.startsWith("/admin");
+
+  function getHref(item: (typeof navItems)[number]) {
+    return isAdmin ? item.adminHref : item.href;
+  }
+
+  function isActive(item: (typeof navItems)[number]) {
+    const href = getHref(item);
+
+    if (href === "/places" || href === "/admin/places") {
       return (
-        pathname === "/places" ||
-        pathname.startsWith("/places/")
+        pathname === href ||
+        pathname.startsWith(`${href}/`)
       );
     }
 
-    if (href === "/products") {
+    if (href === "/products" || href === "/admin/products") {
       return (
-        pathname === "/products" ||
-        pathname.startsWith("/products/")
+        pathname === href ||
+        pathname.startsWith(`${href}/`)
       );
     }
 
-    if (href === "/articles") {
+    if (href === "/articles" || href === "/admin/articles") {
       return (
-        pathname === "/articles" ||
-        pathname.startsWith("/articles/")
+        pathname === href ||
+        pathname.startsWith(`${href}/`)
       );
     }
 
-    if (href === "/my-list") {
+    if (href === "/my-list" || href === "/admin/my-list") {
       return (
-        pathname === "/my-list" ||
-        pathname.startsWith("/my-list/")
+        pathname === href ||
+        pathname.startsWith(`${href}/`)
+      );
+    }
+
+    if (href === "/food" || href === "/admin/food") {
+      return (
+        pathname === href ||
+        pathname.startsWith(`${href}/`)
       );
     }
 
@@ -72,7 +93,7 @@ export default function SiteHeader() {
       <header className="site-header">
         <div className="site-header__inner">
           <Link
-            href="/"
+            href={isAdmin ? "/admin" : "/"}
             className="site-header__logo"
             onClick={closeMenu}
           >
@@ -81,12 +102,13 @@ export default function SiteHeader() {
 
           <nav className="site-header__desktop-nav">
             {navItems.map((item) => {
-              const active = isActive(item.href);
+              const active = isActive(item);
+              const href = getHref(item);
 
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={href}
                   className={`site-header__nav-link ${
                     active
                       ? "site-header__nav-link--active"
@@ -130,12 +152,13 @@ export default function SiteHeader() {
         >
           <nav className="site-header__mobile-nav">
             {navItems.map((item) => {
-              const active = isActive(item.href);
+              const active = isActive(item);
+              const href = getHref(item);
 
               return (
                 <Link
                   key={item.href}
-                  href={item.href}
+                  href={href}
                   onClick={closeMenu}
                   className={`site-header__mobile-link ${
                     active
