@@ -38,7 +38,7 @@ type ListItem = {
   type: "food" | "product" | "place";
   name: string;
   image_url: string | null;
-  brand?: string | null;
+  brand: string | null;
   href: string;
 };
 
@@ -82,7 +82,8 @@ export default function MyListPage() {
       return;
     }
 
-    const savedItems = (savedData ?? []) as SavedItem[];
+    const savedItems =
+      (savedData ?? []) as SavedItem[];
 
     const foodIds = savedItems
       .map((item) => item.food_id)
@@ -112,6 +113,7 @@ export default function MyListPage() {
             .from("foods")
             .select("id, name, image_url")
             .in("id", foodIds)
+            .eq("status", "active")
         : Promise.resolve({
             data: [],
             error: null,
@@ -124,6 +126,7 @@ export default function MyListPage() {
               "id, name, brand, image_url"
             )
             .in("id", productIds)
+            .eq("status", "published")
         : Promise.resolve({
             data: [],
             error: null,
@@ -136,35 +139,50 @@ export default function MyListPage() {
               "id, name, image_url"
             )
             .in("id", placeIds)
+            .eq("status", "published")
         : Promise.resolve({
             data: [],
             error: null,
           }),
     ]);
 
-    const foods = (foodsResult.data ?? []) as Food[];
+    const foods =
+      (foodsResult.data ?? []) as Food[];
+
     const products =
       (productsResult.data ?? []) as Product[];
+
     const places =
       (placesResult.data ?? []) as Place[];
 
     const foodMap = new Map(
-      foods.map((item) => [item.id, item])
+      foods.map((item) => [
+        item.id,
+        item,
+      ])
     );
 
     const productMap = new Map(
-      products.map((item) => [item.id, item])
+      products.map((item) => [
+        item.id,
+        item,
+      ])
     );
 
     const placeMap = new Map(
-      places.map((item) => [item.id, item])
+      places.map((item) => [
+        item.id,
+        item,
+      ])
     );
 
     const result: ListItem[] = [];
 
     for (const saved of savedItems) {
       if (saved.food_id) {
-        const food = foodMap.get(saved.food_id);
+        const food = foodMap.get(
+          saved.food_id
+        );
 
         if (food) {
           result.push({
@@ -172,15 +190,17 @@ export default function MyListPage() {
             type: "food",
             name: food.name,
             image_url: food.image_url,
+            brand: null,
             href: `/food/${food.id}`,
           });
         }
       }
 
       if (saved.product_id) {
-        const product = productMap.get(
-          saved.product_id
-        );
+        const product =
+          productMap.get(
+            saved.product_id
+          );
 
         if (product) {
           result.push({
@@ -195,9 +215,10 @@ export default function MyListPage() {
       }
 
       if (saved.place_id) {
-        const place = placeMap.get(
-          saved.place_id
-        );
+        const place =
+          placeMap.get(
+            saved.place_id
+          );
 
         if (place) {
           result.push({
@@ -205,6 +226,7 @@ export default function MyListPage() {
             type: "place",
             name: place.name,
             image_url: place.image_url,
+            brand: null,
             href: `/places/${place.id}`,
           });
         }
@@ -215,7 +237,9 @@ export default function MyListPage() {
     setLoading(false);
   }
 
-  async function removeItem(savedId: string) {
+  async function removeItem(
+    savedId: string
+  ) {
     const {
       data: { session },
     } = await supabase.auth.getSession();
@@ -365,7 +389,9 @@ export default function MyListPage() {
                       <img
                         src={item.image_url}
                         alt={item.name}
-                        style={styles.imageElement}
+                        style={
+                          styles.imageElement
+                        }
                       />
                     ) : (
                       <span>

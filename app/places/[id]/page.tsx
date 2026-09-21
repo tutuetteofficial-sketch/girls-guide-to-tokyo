@@ -1,7 +1,7 @@
 import Link from "next/link";
-import SiteHeader from "@/components/SiteHeader";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import SaveButton from "@/components/SaveButton";
 
 type Place = {
   id: string;
@@ -171,7 +171,10 @@ export default async function PlaceDetailPage({
 
   const categories =
     ((categoriesResult.data ?? [])
-      .map((item: any) => item.place_categories)
+      .map(
+        (item: any) =>
+          item.place_categories
+      )
       .filter(Boolean) ?? []) as PlaceCategory[];
 
   const productRelations =
@@ -181,7 +184,8 @@ export default async function PlaceDetailPage({
   const productIds = [
     ...new Set(
       productRelations.map(
-        (relation) => relation.product_id
+        (relation) =>
+          relation.product_id
       )
     ),
   ];
@@ -211,8 +215,6 @@ export default async function PlaceDetailPage({
 
   return (
     <main style={styles.main}>
-      <SiteHeader />
-
       <div style={styles.container}>
         <div style={styles.subHeader}>
           <Link
@@ -247,14 +249,18 @@ export default async function PlaceDetailPage({
 
             {categories.length > 0 && (
               <div style={styles.categories}>
-                {categories.map((category) => (
-                  <span
-                    key={category.id}
-                    style={styles.category}
-                  >
-                    {category.name}
-                  </span>
-                ))}
+                {categories.map(
+                  (category) => (
+                    <span
+                      key={category.id}
+                      style={
+                        styles.category
+                      }
+                    >
+                      {category.name}
+                    </span>
+                  )
+                )}
               </div>
             )}
 
@@ -262,10 +268,19 @@ export default async function PlaceDetailPage({
               {place.name}
             </h1>
 
+            <div style={styles.saveArea}>
+              <SaveButton
+                type="place"
+                itemId={place.id}
+              />
+            </div>
+
             {(region || area) && (
               <p style={styles.location}>
                 {region?.name ?? ""}
-                {region && area ? " / " : ""}
+                {region && area
+                  ? " / "
+                  : ""}
                 {area?.name ?? ""}
               </p>
             )}
@@ -284,11 +299,19 @@ export default async function PlaceDetailPage({
 
             {place.editor_note && (
               <div style={styles.editorNote}>
-                <p style={styles.editorNoteLabel}>
+                <p
+                  style={
+                    styles.editorNoteLabel
+                  }
+                >
                   TOKYO GIRL'S NOTE
                 </p>
 
-                <p style={styles.editorNoteText}>
+                <p
+                  style={
+                    styles.editorNoteText
+                  }
+                >
                   {place.editor_note}
                 </p>
               </div>
@@ -300,31 +323,41 @@ export default async function PlaceDetailPage({
           <section style={styles.section}>
             <div style={styles.sectionHeader}>
               <div>
-                <p style={styles.sectionEyebrow}>
+                <p
+                  style={
+                    styles.sectionEyebrow
+                  }
+                >
                   INSIDE THE PLACE
                 </p>
 
-                <h2 style={styles.sectionTitle}>
+                <h2
+                  style={styles.sectionTitle}
+                >
                   Gallery
                 </h2>
               </div>
             </div>
 
             <div style={styles.galleryGrid}>
-              {images.slice(1).map((image) => (
-                <div
-                  key={image.id}
-                  style={styles.galleryImage}
-                >
-                  <img
-                    src={image.image_url}
-                    alt={place.name}
+              {images
+                .slice(1)
+                .map((image) => (
+                  <div
+                    key={image.id}
                     style={
-                      styles.galleryImageElement
+                      styles.galleryImage
                     }
-                  />
-                </div>
-              ))}
+                  >
+                    <img
+                      src={image.image_url}
+                      alt={place.name}
+                      style={
+                        styles.galleryImageElement
+                      }
+                    />
+                  </div>
+                ))}
             </div>
           </section>
         )}
@@ -332,11 +365,17 @@ export default async function PlaceDetailPage({
         <section style={styles.section}>
           <div style={styles.sectionHeader}>
             <div>
-              <p style={styles.sectionEyebrow}>
+              <p
+                style={
+                  styles.sectionEyebrow
+                }
+              >
                 WHAT TO BUY
               </p>
 
-              <h2 style={styles.sectionTitle}>
+              <h2
+                style={styles.sectionTitle}
+              >
                 Available here
               </h2>
             </div>
@@ -364,66 +403,102 @@ export default async function PlaceDetailPage({
             </div>
           ) : (
             <div style={styles.productGrid}>
-              {products.map((product) => (
-                <Link
-                  key={product.id}
-                  href={`/products/${product.id}`}
-                  style={styles.productCard}
-                >
-                  <div style={styles.productImage}>
-                    {product.image_url ? (
-                      <img
-                        src={product.image_url}
-                        alt={product.name}
+              {products.map(
+                (product) => (
+                  <Link
+                    key={product.id}
+                    href={`/products/${product.id}`}
+                    style={
+                      styles.productCard
+                    }
+                  >
+                    <div
+                      style={
+                        styles.productImage
+                      }
+                    >
+                      {product.image_url ? (
+                        <img
+                          src={
+                            product.image_url
+                          }
+                          alt={
+                            product.name
+                          }
+                          style={
+                            styles.productImageElement
+                          }
+                        />
+                      ) : (
+                        <span>
+                          TOKYO GUIDE
+                        </span>
+                      )}
+
+                      {(product.editor_pick ??
+                        0) > 0 && (
+                        <span
+                          style={
+                            styles.pickBadge
+                          }
+                        >
+                          PICK
+                        </span>
+                      )}
+                    </div>
+
+                    <div
+                      style={
+                        styles.productBody
+                      }
+                    >
+                      {product.brand && (
+                        <p
+                          style={
+                            styles.brand
+                          }
+                        >
+                          {product.brand}
+                        </p>
+                      )}
+
+                      <h3
                         style={
-                          styles.productImageElement
-                        }
-                      />
-                    ) : (
-                      <span>
-                        TOKYO GUIDE
-                      </span>
-                    )}
-
-                    {(product.editor_pick ?? 0) >
-                      0 && (
-                      <span style={styles.pickBadge}>
-                        PICK
-                      </span>
-                    )}
-                  </div>
-
-                  <div style={styles.productBody}>
-                    {product.brand && (
-                      <p style={styles.brand}>
-                        {product.brand}
-                      </p>
-                    )}
-
-                    <h3 style={styles.productName}>
-                      {product.name}
-                    </h3>
-
-                    {product.description && (
-                      <p
-                        style={
-                          styles.productDescription
+                          styles.productName
                         }
                       >
-                        {product.description}
-                      </p>
-                    )}
+                        {product.name}
+                      </h3>
 
-                    <div style={styles.viewProduct}>
-                      <span>
-                        View product
-                      </span>
+                      {product.description && (
+                        <p
+                          style={
+                            styles.productDescription
+                          }
+                        >
+                          {
+                            product.description
+                          }
+                        </p>
+                      )}
 
-                      <span>→</span>
+                      <div
+                        style={
+                          styles.viewProduct
+                        }
+                      >
+                        <span>
+                          View product
+                        </span>
+
+                        <span>
+                          →
+                        </span>
+                      </div>
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  </Link>
+                )
+              )}
             </div>
           )}
         </section>
@@ -498,7 +573,8 @@ const styles = {
     fontWeight: 700,
     letterSpacing: "1.2px",
     margin: 0,
-    textTransform: "uppercase" as const,
+    textTransform:
+      "uppercase" as const,
   },
 
   categories: {
@@ -519,6 +595,10 @@ const styles = {
     fontSize: "48px",
     lineHeight: 1.15,
     margin: "12px 0 0",
+  },
+
+  saveArea: {
+    marginTop: "20px",
   },
 
   location: {
@@ -544,7 +624,8 @@ const styles = {
     marginTop: "28px",
     padding: "18px",
     background: "#fff",
-    borderLeft: "3px solid #c8647b",
+    borderLeft:
+      "3px solid #c8647b",
   },
 
   editorNoteLabel: {
@@ -565,12 +646,14 @@ const styles = {
   section: {
     marginTop: "65px",
     paddingTop: "32px",
-    borderTop: "1px solid #e8dfdb",
+    borderTop:
+      "1px solid #e8dfdb",
   },
 
   sectionHeader: {
     display: "flex",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     alignItems: "flex-end",
     gap: "20px",
     marginBottom: "25px",
@@ -695,11 +778,13 @@ const styles = {
 
   viewProduct: {
     display: "flex",
-    justifyContent: "space-between",
+    justifyContent:
+      "space-between",
     alignItems: "center",
     marginTop: "16px",
     paddingTop: "12px",
-    borderTop: "1px solid #eee6e2",
+    borderTop:
+      "1px solid #eee6e2",
     color: "#c8647b",
     fontSize: "11px",
   },

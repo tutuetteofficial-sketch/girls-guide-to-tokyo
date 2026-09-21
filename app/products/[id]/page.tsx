@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import SiteHeader from "@/components/SiteHeader";
+import SaveButton from "@/components/SaveButton";
 
 type Product = {
   id: string;
@@ -80,7 +80,8 @@ export default async function ProductDetailPage({
     notFound();
   }
 
-  const loadedProduct = product as Product;
+  const loadedProduct =
+    product as Product;
 
   const [
     categoryResult,
@@ -280,8 +281,6 @@ export default async function ProductDetailPage({
 
   return (
     <main style={styles.main}>
-      <SiteHeader />
-
       <div
         style={styles.container}
         className="product-detail-container"
@@ -333,6 +332,13 @@ export default async function ProductDetailPage({
               {loadedProduct.name}
             </h1>
 
+            <div style={styles.saveArea}>
+              <SaveButton
+                type="product"
+                itemId={loadedProduct.id}
+              />
+            </div>
+
             {(loadedProduct.editor_pick ?? 0) > 0 && (
               <div style={styles.pick}>
                 <span>
@@ -343,13 +349,9 @@ export default async function ProductDetailPage({
                   {"★".repeat(
                     loadedProduct.editor_pick ?? 0
                   )}
-
                   {"☆".repeat(
                     5 -
-                      (
-                        loadedProduct.editor_pick ??
-                        0
-                      )
+                      (loadedProduct.editor_pick ?? 0)
                   )}
                 </span>
               </div>
@@ -549,9 +551,7 @@ export default async function ProductDetailPage({
                       )}
 
                       {place.price_range && (
-                        <p
-                          style={styles.price}
-                        >
+                        <p style={styles.price}>
                           {place.price_range}
                         </p>
                       )}
@@ -695,6 +695,10 @@ const styles = {
     fontSize: "48px",
     lineHeight: 1.15,
     margin: "10px 0 0",
+  },
+
+  saveArea: {
+    marginTop: "20px",
   },
 
   pick: {
