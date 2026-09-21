@@ -1,7 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { supabase } from "@/lib/supabase";
-import SiteHeader from "@/components/SiteHeader";
+import SaveButton from "@/components/SaveButton";
 
 type Food = {
   id: string;
@@ -22,7 +22,6 @@ type Place = {
   name: string;
   description: string | null;
   image_url: string | null;
-  group_id: string | null;
   region_id: number | null;
   area_id: number | null;
   price_range: string | null;
@@ -36,11 +35,6 @@ type Region = {
 
 type Area = {
   id: number;
-  name: string;
-};
-
-type Group = {
-  id: string;
   name: string;
 };
 
@@ -121,6 +115,7 @@ export default async function FoodDetailPage({
   if (placeIds.length > 0) {
     const {
       data: placeData,
+      error: placeError,
     } = await supabase
       .from("places")
       .select(`
@@ -128,21 +123,23 @@ export default async function FoodDetailPage({
         name,
         description,
         image_url,
-        group_id,
         region_id,
         area_id,
         price_range,
         editor_note
       `)
-      .in(
-        "id",
-        placeIds
-      )
+      .in("id", placeIds)
       .eq(
         "status",
         "published"
       )
       .order("name");
+
+    if (placeError) {
+      throw new Error(
+        placeError.message
+      );
+    }
 
     places =
       (placeData ?? []) as Place[];
@@ -180,26 +177,9 @@ export default async function FoodDetailPage({
     ),
   ];
 
-  const groupIds = [
-    ...new Set(
-      places
-        .map(
-          (place) =>
-            place.group_id
-        )
-        .filter(
-          (
-            value
-          ): value is string =>
-            value !== null
-        )
-    ),
-  ];
-
   const [
     regionsResult,
     areasResult,
-    groupsResult,
   ] = await Promise.all([
     regionIds.length > 0
       ? supabase
@@ -221,27 +201,6 @@ export default async function FoodDetailPage({
           .in(
             "id",
             areaIds
-          )
-      : Promise.resolve({
-          data: [],
-          error: null,
-        }),
-
-    groupIds.length > 0
-      ? supabase
-          .from(
-            "place_groups"
-          )
-          .select(
-            "id, name"
-          )
-          .in(
-            "id",
-            groupIds
-          )
-          .eq(
-            "is_active",
-            true
           )
       : Promise.resolve({
           data: [],
@@ -275,23 +234,8 @@ export default async function FoodDetailPage({
       )
     );
 
-  const groupMap =
-    new Map<string, string>(
-      (
-        (groupsResult.data ??
-          []) as Group[]
-      ).map(
-        (group) => [
-          String(group.id),
-          group.name,
-        ]
-      )
-    );
-
   return (
     <main style={styles.main}>
-      <SiteHeader />
-
       <div style={styles.container}>
         <div style={styles.subHeader}>
           <Link
@@ -342,6 +286,13 @@ export default async function FoodDetailPage({
               {loadedFood.name}
             </h1>
 
+            <div style={styles.saveArea}>
+              <SaveButton
+                type="food"
+                itemId={loadedFood.id}
+              />
+            </div>
+
             {(loadedFood.editor_pick ??
               0) > 0 && (
               <div
@@ -387,7 +338,8 @@ export default async function FoodDetailPage({
 
           {places.length === 0 ? (
             <div style={styles.empty}>
-              このFoodを提供している店舗はまだ登録されていません。
+              No stores serving this food
+              have been listed yet.
             </div>
           ) : (
             <div
@@ -411,15 +363,6 @@ export default async function FoodDetailPage({
                       ? areaMap.get(
                           place.area_id
                         )
-                      : null;
-
-                  const groupName =
-                    place.group_id
-                      ? groupMap.get(
-                          String(
-                            place.group_id
-                          )
-                        ) ?? null
                       : null;
 
                   return (
@@ -461,18 +404,6 @@ export default async function FoodDetailPage({
                           styles.placeBody
                         }
                       >
-                        {groupName && (
-                          <p
-                            style={
-                              styles.group
-                            }
-                          >
-                            {
-                              groupName
-                            }
-                          </p>
-                        )}
-
                         <h3
                           style={
                             styles.placeName
@@ -501,11 +432,7 @@ export default async function FoodDetailPage({
                         )}
 
                         {place.price_range && (
-                          <p
-                            style={
-                              styles.price
-                            }
-                          >
+                          <p style={styles.price}>
                             {
                               place.price_range
                             }
@@ -675,6 +602,11 @@ const styles = {
       "10px 0 0",
   },
 
+  saveArea: {
+    marginTop:
+      "20px",
+  },
+
   pick: {
     color:
       "#c8647b",
@@ -778,14 +710,6 @@ const styles = {
   placeBody: {
     padding:
       "14px",
-  },
-
-  group: {
-    color:
-      "#999",
-    fontSize:
-      "10px",
-    margin: 0,
   },
 
   placeName: {
