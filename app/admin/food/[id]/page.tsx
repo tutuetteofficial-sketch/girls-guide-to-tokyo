@@ -2,19 +2,11 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import {
-  useParams,
-  useRouter,
-} from "next/navigation";
+import { useParams, useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 
 type Category = {
   id: number;
-  name: string;
-};
-
-type Place = {
-  id: string;
   name: string;
 };
 
@@ -26,11 +18,9 @@ export default function FoodDetailPage() {
 
   const [siteId, setSiteId] = useState("");
   const [categories, setCategories] = useState<Category[]>([]);
-  const [places, setPlaces] = useState<Place[]>([]);
 
   const [name, setName] = useState("");
   const [categoryId, setCategoryId] = useState("");
-  const [placeId, setPlaceId] = useState("");
   const [description, setDescription] = useState("");
   const [imageUrl, setImageUrl] = useState("");
   const [editorPick, setEditorPick] = useState(0);
@@ -49,24 +39,23 @@ export default function FoodDetailPage() {
 
   async function loadData() {
     setLoading(true);
+    setErrorMessage("");
 
     try {
-      const { data: food, error: foodError } =
-        await supabase
-          .from("foods")
-          .select(`
-            id,
-            site_id,
-            name,
-            category_id,
-            place_id,
-            description,
-            image_url,
-            editor_pick,
-            status
-          `)
-          .eq("id", id)
-          .single();
+      const { data: food, error: foodError } = await supabase
+        .from("foods")
+        .select(`
+          id,
+          site_id,
+          name,
+          category_id,
+          description,
+          image_url,
+          editor_pick,
+          status
+        `)
+        .eq("id", id)
+        .single();
 
       if (foodError || !food) {
         throw foodError || new Error("Food not found.");
@@ -75,37 +64,30 @@ export default function FoodDetailPage() {
       setSiteId(food.site_id);
 
       setName(food.name ?? "");
+
       setCategoryId(
         food.category_id
           ? String(food.category_id)
           : ""
       );
-      setPlaceId(food.place_id ?? "");
+
       setDescription(food.description ?? "");
       setImageUrl(food.image_url ?? "");
       setEditorPick(food.editor_pick ?? 0);
       setStatus(food.status ?? "active");
 
-      const [categoryResult, placeResult] =
-        await Promise.all([
-          supabase
-            .from("food_categories")
-            .select("id, name")
-            .eq("site_id", food.site_id)
-            .order("sort_order"),
+      const { data: categoryData, error: categoryError } =
+        await supabase
+          .from("food_categories")
+          .select("id, name")
+          .eq("site_id", food.site_id)
+          .order("sort_order");
 
-          supabase
-            .from("places")
-            .select("id, name")
-            .eq("site_id", food.site_id)
-            .order("name"),
-        ]);
+      if (categoryError) {
+        throw categoryError;
+      }
 
-      if (categoryResult.error) throw categoryResult.error;
-      if (placeResult.error) throw placeResult.error;
-
-      setCategories(categoryResult.data ?? []);
-      setPlaces(placeResult.data ?? []);
+      setCategories(categoryData ?? []);
     } catch (error) {
       setErrorMessage(
         error instanceof Error
@@ -138,8 +120,6 @@ export default function FoodDetailPage() {
             ? Number(categoryId)
             : null,
 
-          place_id: placeId || null,
-
           description:
             description.trim() || null,
 
@@ -155,7 +135,9 @@ export default function FoodDetailPage() {
         })
         .eq("id", id);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       setSuccessMessage(
         "Food updated successfully ✦"
@@ -188,7 +170,9 @@ export default function FoodDetailPage() {
         .delete()
         .eq("id", id);
 
-      if (error) throw error;
+      if (error) {
+        throw error;
+      }
 
       router.push("/admin/food");
       router.refresh();
@@ -206,7 +190,9 @@ export default function FoodDetailPage() {
   if (loading) {
     return (
       <main style={styles.page}>
-        Loading...
+        <div style={styles.container}>
+          Loading...
+        </div>
       </main>
     );
   }
@@ -215,7 +201,10 @@ export default function FoodDetailPage() {
     <main style={styles.page}>
       <div style={styles.container}>
 
-        <Link href="/admin/food" style={styles.back}>
+        <Link
+          href="/admin/food"
+          style={styles.back}
+        >
           ← Food Database
         </Link>
 
@@ -235,7 +224,9 @@ export default function FoodDetailPage() {
             disabled={deleting}
             style={styles.delete}
           >
-            {deleting ? "Deleting..." : "Delete"}
+            {deleting
+              ? "Deleting..."
+              : "Delete"}
           </button>
         </div>
 
@@ -259,7 +250,9 @@ export default function FoodDetailPage() {
 
           <input
             value={name}
-            onChange={(e) => setName(e.target.value)}
+            onChange={(e) =>
+              setName(e.target.value)
+            }
             style={styles.input}
           />
 
@@ -274,7 +267,9 @@ export default function FoodDetailPage() {
             }
             style={styles.input}
           >
-            <option value="">No category</option>
+            <option value="">
+              No category
+            </option>
 
             {categories.map((category) => (
               <option
@@ -282,29 +277,6 @@ export default function FoodDetailPage() {
                 value={category.id}
               >
                 {category.name}
-              </option>
-            ))}
-          </select>
-
-          <label style={styles.label}>
-            Place
-          </label>
-
-          <select
-            value={placeId}
-            onChange={(e) =>
-              setPlaceId(e.target.value)
-            }
-            style={styles.input}
-          >
-            <option value="">No place selected</option>
-
-            {places.map((place) => (
-              <option
-                key={place.id}
-                value={place.id}
-              >
-                {place.name}
               </option>
             ))}
           </select>
@@ -349,12 +321,17 @@ export default function FoodDetailPage() {
           <select
             value={editorPick}
             onChange={(e) =>
-              setEditorPick(Number(e.target.value))
+              setEditorPick(
+                Number(e.target.value)
+              )
             }
             style={styles.input}
           >
             {[0, 1, 2, 3, 4, 5].map((n) => (
-              <option key={n} value={n}>
+              <option
+                key={n}
+                value={n}
+              >
                 {n === 0
                   ? "Not selected"
                   : "★".repeat(n)}
@@ -411,7 +388,10 @@ export default function FoodDetailPage() {
   );
 }
 
-const styles: Record<string, React.CSSProperties> = {
+const styles: Record<
+  string,
+  React.CSSProperties
+> = {
   page: {
     minHeight: "100vh",
     padding: 40,
@@ -477,6 +457,7 @@ const styles: Record<string, React.CSSProperties> = {
     borderRadius: 10,
     border: "1px solid #dfd3da",
     boxSizing: "border-box",
+    resize: "vertical",
   },
 
   preview: {
